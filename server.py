@@ -42,15 +42,21 @@ def parse_front_matter(text):
 
 
 def safe_slug(raw):
-    return re.sub(r"[^a-zA-Z0-9_-]", "", unquote(raw))
+    """Sanitize a possibly nested slug like 'workspace/plan-name'."""
+    parts = [re.sub(r"[^a-zA-Z0-9_-]", "", p) for p in unquote(raw).split("/")]
+    return "/".join(p for p in parts if p)
 
 
 def plan_file(slug):
-    return os.path.join(PLANS_DIR, slug + ".md")
+    return os.path.join(PLANS_DIR, *slug.split("/")) + ".md"
 
 
 def feedback_file(slug):
-    return os.path.join(FEEDBACK_DIR, slug + ".json")
+    return os.path.join(FEEDBACK_DIR, *slug.split("/")) + ".json"
+
+
+def inbox_file(slug):
+    return os.path.join(INBOX_DIR, slug.replace("/", "__") + ".json")
 
 
 def load_feedback(slug):
@@ -62,31 +68,36 @@ def load_feedback(slug):
 
 
 def save_feedback(slug, data):
-    with open(feedback_file(slug), "w") as f:
+    path = feedback_file(slug)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w") as f:
         json.dump(data, f, indent=2)
 
 
 def list_plans():
     plans = []
-    for name in os.listdir(PLANS_DIR):
-        if not name.endswith(".md"):
-            continue
-        slug = name[:-3]
-        path = os.path.join(PLANS_DIR, name)
-        with open(path) as f:
-            meta, _ = parse_front_matter(f.read())
-        counts = {"draft": 0, "submitted": 0, "resolved": 0}
-        for item in load_feedback(slug)["items"]:
-            counts[item.get("status", "draft")] = counts.get(item.get("status", "draft"), 0) + 1
-        plans.append({
-            "slug": slug,
-            "title": meta.get("title", slug),
-            "version": meta.get("version", "1"),
-            "status": meta.get("status", "draft"),
-            "updated": meta.get("updated", ""),
-            "mtime": os.path.getmtime(path),
-            "counts": counts,
-        })
+    for dirpath, _, files in os.walk(PLANS_DIR):
+        for name in files:
+            if not name.endswith(".md"):
+                continue
+            path = os.path.join(dirpath, name)
+            rel = os.path.relpath(path, PLANS_DIR)
+            slug = rel[:-3].replace(os.sep, "/")
+            with open(path) as f:
+                meta, _ = parse_front_matter(f.read())
+            counts = {"draft": 0, "submitted": 0, "resolved": 0}
+            for item in load_feedback(slug)["items"]:
+                counts[item.get("status", "draft")] = counts.get(item.get("status", "draft"), 0) + 1
+            plans.append({
+                "slug": slug,
+                "workspace": slug.rsplit("/", 1)[0] if "/" in slug else "",
+                "title": meta.get("title", slug),
+                "version": meta.get("version", "1"),
+                "status": meta.get("status", "draft"),
+                "updated": meta.get("updated", ""),
+                "mtime": os.path.getmtime(path),
+                "counts": counts,
+            })
     plans.sort(key=lambda p: -p["mtime"])
     return plans
 
@@ -118,6 +129,9 @@ a.card:hover {{ border-color:var(--accent); }}
 .t {{ font-size:19px; }}
 .meta {{ color:var(--muted); font:12px ui-monospace, Menlo, monospace; margin-top:6px; }}
 .empty {{ color:var(--muted); font-style:italic; }}
+h2.ws {{ font:13px ui-monospace, Menlo, monospace; text-transform:uppercase;
+         letter-spacing:.08em; color:var(--accent); margin:28px 0 10px;
+         padding-bottom:6px; border-bottom:1px solid var(--line); }}
 </style></head><body><main>
 <h1>Plans</h1>
 <div class="sub">plan review server, port {port}</div>
@@ -128,17 +142,22 @@ a.card:hover {{ border-color:var(--accent); }}
 def render_index(port):
     plans = list_plans()
     if not plans:
-        rows = '<p class="empty">No plans yet. Claude will write the first one to plans/.</p>'
+        rows = '<p class="empty">No plans yet. Claude will write the first one to plans/&lt;workspace&gt;/.</p>'
     else:
-        rows = ""
+        groups = {}
         for p in plans:
-            c = p["counts"]
-            fb = "%d draft, %d waiting, %d resolved" % (c["draft"], c["submitted"], c["resolved"])
-            rows += (
-                '<a class="card" href="/plan/%s"><div class="t">%s</div>'
-                '<div class="meta">v%s &middot; %s &middot; updated %s &middot; %s</div></a>'
-                % (p["slug"], p["title"], p["version"], p["status"], p["updated"], fb)
-            )
+            groups.setdefault(p["workspace"], []).append(p)
+        rows = ""
+        for ws, items in groups.items():
+            rows += '<h2 class="ws">%s</h2>' % (ws or "ungrouped")
+            for p in items:
+                c = p["counts"]
+                fb = "%d draft, %d waiting, %d resolved" % (c["draft"], c["submitted"], c["resolved"])
+                rows += (
+                    '<a class="card" href="/plan/%s"><div class="t">%s</div>'
+                    '<div class="meta">v%s &middot; %s &middot; updated %s &middot; %s</div></a>'
+                    % (p["slug"], p["title"], p["version"], p["status"], p["updated"], fb)
+                )
     return INDEX_TEMPLATE.format(port=port, rows=rows)
 
 
@@ -199,7 +218,7 @@ class Handler(BaseHTTPRequestHandler):
         if path.startswith("/plan/"):
             return self.send_file(os.path.join(ROOT, "viewer.html"), "text/html")
         if path.startswith("/api/plan/"):
-            slug = safe_slug(path.rsplit("/", 1)[1])
+            slug = safe_slug(path[len("/api/plan/"):])
             p = plan_file(slug)
             if not os.path.exists(p):
                 return self.send_json({"error": "not found"}, 404)
@@ -208,7 +227,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json({"slug": slug, "meta": meta, "markdown": body,
                                    "mtime": os.path.getmtime(p)})
         if path.startswith("/api/feedback/"):
-            slug = safe_slug(path.rsplit("/", 1)[1])
+            slug = safe_slug(path[len("/api/feedback/"):])
             return self.send_json(load_feedback(slug))
         self.send_json({"error": "not found"}, 404)
 
@@ -216,8 +235,8 @@ class Handler(BaseHTTPRequestHandler):
         path = self.path.split("?")[0]
         parts = [p for p in path.split("/") if p]
 
-        if len(parts) == 4 and parts[:2] == ["api", "feedback"] and parts[3] == "delete":
-            slug = safe_slug(parts[2])
+        if len(parts) >= 4 and parts[:2] == ["api", "feedback"] and parts[-1] == "delete":
+            slug = safe_slug("/".join(parts[2:-1]))
             body = self.read_body()
             with LOCK:
                 data = load_feedback(slug)
@@ -227,8 +246,8 @@ class Handler(BaseHTTPRequestHandler):
                 save_feedback(slug, data)
             return self.send_json({"ok": True})
 
-        if len(parts) == 3 and parts[:2] == ["api", "feedback"]:
-            slug = safe_slug(parts[2])
+        if len(parts) >= 3 and parts[:2] == ["api", "feedback"]:
+            slug = safe_slug("/".join(parts[2:]))
             item = self.read_body()
             allowed = {"type", "quote", "prefix", "suffix", "section",
                        "comment", "suggested_text"}
@@ -242,8 +261,8 @@ class Handler(BaseHTTPRequestHandler):
                 save_feedback(slug, data)
             return self.send_json({"ok": True, "id": item["id"]})
 
-        if len(parts) == 3 and parts[:2] == ["api", "submit"]:
-            slug = safe_slug(parts[2])
+        if len(parts) >= 3 and parts[:2] == ["api", "submit"]:
+            slug = safe_slug("/".join(parts[2:]))
             with LOCK:
                 data = load_feedback(slug)
                 n = 0
@@ -254,7 +273,7 @@ class Handler(BaseHTTPRequestHandler):
                 if n:
                     data["submitted_at"] = time.time()
                     save_feedback(slug, data)
-                    with open(os.path.join(INBOX_DIR, slug + ".json"), "w") as f:
+                    with open(inbox_file(slug), "w") as f:
                         json.dump({"slug": slug, "count": n, "at": time.time()}, f)
             return self.send_json({"ok": True, "submitted": n})
 

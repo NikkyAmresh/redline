@@ -9,7 +9,7 @@ The user does not want long plans printed in the terminal. Plans are written as 
 
 ## 1. Write the plan
 
-Create `~/.claude/plan-server/plans/<slug>.md` (slug: lowercase, hyphens). Required front matter:
+Create `~/.claude/plan-server/plans/<workspace>/<slug>.md` (both lowercase, hyphens). `<workspace>` is the project the plan belongs to, normally the kebab-cased basename of the repo or working directory (e.g. `autotrader`, `plan-server`). Every plan goes in a workspace folder; never write directly into `plans/`. The index page groups plans by workspace. Required front matter:
 
 ```
 ---
@@ -32,7 +32,7 @@ curl -sf http://localhost:4747/api/health >/dev/null 2>&1 \
   || echo "server down"
 ```
 
-If down, start it with Bash `run_in_background`: `python3 /Users/nikky.amresh/.claude/plan-server/server.py`. Then `open http://localhost:4747/plan/<slug>`.
+If down, start it with Bash `run_in_background`: `python3 /Users/nikky.amresh/.claude/plan-server/server.py`. Then `open http://localhost:4747/plan/<workspace>/<slug>`.
 
 ## 3. Watch the inbox
 
@@ -48,11 +48,11 @@ while true; do
 done
 ```
 
-Description: "plan feedback inbox". The `mv` to `.claimed` prevents duplicate events. Stale `.claimed` files or inbox files found at session start mean unprocessed feedback from earlier; process them the same way.
+Description: "plan feedback inbox". The `mv` to `.claimed` prevents duplicate events. Stale `.claimed` files or inbox files found at session start mean unprocessed feedback from earlier; process them the same way. Inbox filenames flatten the slug's `/` to `__` (e.g. `autotrader__status.json`); the real slug is in the file's `slug` field.
 
 ## 4. Process feedback when the monitor fires
 
-Read `~/.claude/plan-server/feedback/<slug>.json`. For every item with `"status": "submitted"`:
+Read the claimed inbox file to get the slug, then read `~/.claude/plan-server/feedback/<workspace>/<slug>.json`. For every item with `"status": "submitted"`:
 
 - Items carry: `type` (comment or edit), `quote` (the selected text as rendered, so markdown syntax like `**` or backticks is stripped), `section` (nearest heading), `prefix`/`suffix` (surrounding rendered text), `comment`, and for edits `suggested_text`.
 - Locate the passage in the markdown source using section plus quote; match loosely since rendered text differs from source.
@@ -60,7 +60,7 @@ Read `~/.claude/plan-server/feedback/<slug>.json`. For every item with `"status"
 - `comment` items: revise the plan to address it, or answer the question.
 - For every processed item set `"status": "resolved"` and write a short `"reply"` string (the browser renders it under the item labeled Claude).
 - Bump `version` and `updated` in the plan front matter. The browser polls every 2.5s and shows the new version plus replies automatically.
-- Delete the processed `inbox/<slug>.json.claimed` file.
+- Delete the processed `inbox/<workspace>__<slug>.json.claimed` file.
 - Tell the user in one or two lines what changed; do not restate the plan in the terminal.
 
 ## 5. Implementation phase
