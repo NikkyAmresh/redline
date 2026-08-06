@@ -3,8 +3,9 @@ feedback/
 inbox/
 
 # Plans are local by default; only the example plan is tracked
-plans/*
-!plans/plan-server-v1.md
+plans/**
+!plans/plan-server/
+!plans/plan-server/v1.md
 
 __pycache__/
 .DS_Store

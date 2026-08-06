@@ -236,7 +236,7 @@ button.ghost:hover { color:var(--accent); border-color:var(--accent); }
 <div id="toast"></div>
 
 <script>
-const slug = decodeURIComponent(location.pathname.split('/').filter(Boolean).pop());
+const slug = location.pathname.split('/').filter(Boolean).slice(1).map(decodeURIComponent).join('/');
 const docEl = document.getElementById('doc');
 const itemsEl = document.getElementById('items');
 const seltool = document.getElementById('seltool');
