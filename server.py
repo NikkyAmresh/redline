@@ -126,7 +126,20 @@ a.card {{ display:block; background:var(--surface); border:1px solid var(--line)
           border-radius:10px; padding:18px 20px; margin-bottom:12px;
           text-decoration:none; color:inherit; }}
 a.card:hover {{ border-color:var(--accent); }}
+.trow {{ display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap; }}
 .t {{ font-size:19px; }}
+.chip {{ flex:none; font:11px ui-monospace, Menlo, monospace; text-transform:uppercase;
+         letter-spacing:.06em; padding:2px 10px; border-radius:999px;
+         border:1px solid currentColor; white-space:nowrap;
+         background:color-mix(in srgb, currentColor 12%, transparent); }}
+.chip.ok {{ color:#15803d; }}
+.chip.rev {{ color:#b45309; }}
+.chip.dr {{ color:var(--muted); }}
+.chip.info {{ color:var(--accent); }}
+@media (prefers-color-scheme: dark) {{
+  .chip.ok {{ color:#4ade80; }}
+  .chip.rev {{ color:#fbbf24; }}
+}}
 .meta {{ color:var(--muted); font:12px ui-monospace, Menlo, monospace; margin-top:6px; }}
 .empty {{ color:var(--muted); font-style:italic; }}
 h2.ws {{ font:13px ui-monospace, Menlo, monospace; text-transform:uppercase;
@@ -137,6 +150,17 @@ h2.ws {{ font:13px ui-monospace, Menlo, monospace; text-transform:uppercase;
 <div class="sub">plan review server, port {port}</div>
 {rows}
 </main></body></html>"""
+
+
+def status_class(status):
+    s = status.lower()
+    if any(w in s for w in ("approved", "done", "complete", "shipped")):
+        return "ok"
+    if "review" in s:
+        return "rev"
+    if "draft" in s:
+        return "dr"
+    return "info"
 
 
 def render_index(port):
@@ -154,9 +178,12 @@ def render_index(port):
                 c = p["counts"]
                 fb = "%d draft, %d waiting, %d resolved" % (c["draft"], c["submitted"], c["resolved"])
                 rows += (
-                    '<a class="card" href="/plan/%s"><div class="t">%s</div>'
-                    '<div class="meta">v%s &middot; %s &middot; updated %s &middot; %s</div></a>'
-                    % (p["slug"], p["title"], p["version"], p["status"], p["updated"], fb)
+                    '<a class="card" href="/plan/%s">'
+                    '<div class="trow"><div class="t">%s</div>'
+                    '<span class="chip %s">%s</span></div>'
+                    '<div class="meta">v%s &middot; updated %s &middot; %s</div></a>'
+                    % (p["slug"], p["title"], status_class(p["status"]), p["status"],
+                       p["version"], p["updated"], fb)
                 )
     return INDEX_TEMPLATE.format(port=port, rows=rows)
 
