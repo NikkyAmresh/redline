@@ -52,6 +52,13 @@ Description: "plan feedback inbox". The `mv` to `.claimed` prevents duplicate ev
 
 ## 4. Process feedback when the monitor fires
 
+**Feedback never breaks the task in flight.** The monitor firing is a notification, not an interrupt. If you are mid-task when it fires, glance at the feedback and triage:
+
+- Urgent, or a quick answer (a question answerable in a line or two, a trivial edit): handle it immediately, reply, then continue the current task exactly where you left off.
+- Anything longer (section rewrites, new phases, rethinking the approach): finish the current task to a clean stopping point first, then process the feedback. A slow reply is fine; abandoned or half-done work is not.
+
+Never restart, re-plan, or drop in-flight work because feedback arrived.
+
 Read the claimed inbox file to get the slug, then read `~/.claude/plan-server/feedback/<workspace>/<slug>.json`. For every item with `"status": "submitted"`:
 
 - Items carry: `type` (comment or edit), `quote` (the selected text as rendered, so markdown syntax like `**` or backticks is stripped), `section` (nearest heading), `prefix`/`suffix` (surrounding rendered text), `comment`, and for edits `suggested_text`.
