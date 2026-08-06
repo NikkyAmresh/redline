@@ -91,12 +91,15 @@ mark.fb.flash { outline:2px solid var(--accent); }
 
 #rail {
   width:360px; flex-shrink:0; position:sticky; top:49px;
-  height:calc(100vh - 49px); overflow-y:auto;
+  height:calc(100vh - 49px); overflow:hidden;
   border-left:1px solid var(--line); background:var(--surface);
   padding:20px 18px 32px;
   font-family:-apple-system, "Helvetica Neue", sans-serif; font-size:13.5px;
   display:flex; flex-direction:column; gap:10px;
 }
+#items { flex:1; min-height:0; overflow-y:auto;
+         display:flex; flex-direction:column; gap:10px; }
+#items:empty { display:none; }
 #rail h2 { font:11px ui-monospace, Menlo, monospace; text-transform:uppercase;
            letter-spacing:.1em; color:var(--muted); margin:10px 0 2px; }
 #hint { color:var(--muted); line-height:1.5; }
@@ -205,9 +208,9 @@ button.ghost:hover { color:var(--accent); border-color:var(--accent); }
     <h2>Review</h2>
     <div id="hint">Select any passage in the plan to comment on it or suggest an edit.
       Drafts collect here; send them to Claude in one batch.</div>
-    <div id="items"></div>
     <button class="ghost" id="general">+ General note (no selection)</button>
     <button class="primary" id="submit" disabled>Send to Claude</button>
+    <div id="items"></div>
   </aside>
 </main>
 

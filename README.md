@@ -15,10 +15,19 @@ No dependencies, Python stdlib only. marked and mermaid are vendored in `vendor/
 ```
 server.py        http server: plans, feedback, submit, inbox signals
 viewer.html      review UI: rendering, selection toolbar, review rail, polling
+skill/SKILL.md   Claude Code skill driving the workflow (plan authoring, inbox watching, feedback processing)
 plans/*.md       one plan per file, front matter: title, version, status, updated
 feedback/*.json  comments and suggested edits, statuses draft/submitted/resolved
 inbox/*.json     signal files written on submit, claimed by the Claude session
 vendor/          marked.min.js, mermaid.min.js
+```
+
+## Skill install
+
+The `plan-review` skill lives in this repo and is symlinked into Claude Code's skills directory so the repo stays the single source of truth:
+
+```
+ln -s ../plan-server/skill ~/.claude/skills/plan-review
 ```
 
 ## API
@@ -34,4 +43,4 @@ POST /api/feedback/<slug>/delete   {id} remove a draft
 POST /api/submit/<slug>       drafts -> submitted, writes inbox/<slug>.json
 ```
 
-The Claude side of the workflow is documented in `~/.claude/skills/plan-review/SKILL.md`.
+The Claude side of the workflow is documented in `skill/SKILL.md`.
