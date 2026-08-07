@@ -335,12 +335,16 @@ class Handler(BaseHTTPRequestHandler):
                         hit = True
                 if hit:
                     save_feedback(slug, data)
+                    mode = "independent" if body.get("independent") else "inline"
                     with open(inbox_file(slug), "w") as f:
-                        json.dump({"slug": slug, "count": 1, "at": time.time()}, f)
+                        json.dump({"slug": slug, "count": 1, "at": time.time(),
+                                   "mode": mode}, f)
             return self.send_json({"ok": hit})
 
         if len(parts) >= 3 and parts[:2] == ["api", "submit"]:
             slug = safe_slug("/".join(parts[2:]))
+            body = self.read_body()
+            mode = "independent" if body.get("independent") else "inline"
             with LOCK:
                 data = load_feedback(slug)
                 n = 0
@@ -352,7 +356,8 @@ class Handler(BaseHTTPRequestHandler):
                     data["submitted_at"] = time.time()
                     save_feedback(slug, data)
                     with open(inbox_file(slug), "w") as f:
-                        json.dump({"slug": slug, "count": n, "at": time.time()}, f)
+                        json.dump({"slug": slug, "count": n, "at": time.time(),
+                                   "mode": mode}, f)
             return self.send_json({"ok": True, "submitted": n})
 
         self.send_json({"error": "not found"}, 404)
