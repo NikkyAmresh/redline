@@ -18,7 +18,9 @@ viewer.html      review UI: rendering, selection toolbar, review rail, polling
 skill/SKILL.md   Claude Code skill driving the workflow (plan authoring, inbox watching, feedback processing)
 plans/<workspace>/*.md      one plan per file, grouped by workspace (project) folder;
                             front matter: title, version, status, updated
-feedback/<workspace>/*.json comments and suggested edits, statuses draft/submitted/resolved
+feedback/<workspace>/*.json comments and suggested edits, statuses draft/submitted/answered/resolved;
+                            answered items carry a thread and wait on the user, resolved items
+                            keep a 1-2 line resolution summary instead of the trail
 inbox/*.json                signal files written on submit, claimed by the Claude session
                             (flat; slug slashes become __, real slug is inside the JSON)
 vendor/          marked.min.js, mermaid.min.js
@@ -45,6 +47,8 @@ GET  /api/feedback/<slug>     {items: [...]}
 POST /api/feedback/<slug>     add draft {type, quote, section, prefix, suffix, comment, suggested_text}
 POST /api/feedback/<slug>/delete   {id} remove a draft
 POST /api/submit/<slug>       drafts -> submitted, writes inbox/<workspace>__<name>.json
+POST /api/reply/<slug>        {id, text} user reply on an answered item -> back to submitted,
+                              appends to its thread and writes an inbox file
 ```
 
 The Claude side of the workflow is documented in `skill/SKILL.md`.
