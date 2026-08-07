@@ -41,14 +41,14 @@ Arm a persistent Monitor (one per session is enough, it covers all plans):
 ```
 while true; do
   for f in $(find /Users/nikky.amresh/.claude/plan-server/inbox -maxdepth 1 -name '*.json' 2>/dev/null); do
-    echo "FEEDBACK $(basename "$f" .json)"
+    echo "FEEDBACK $(basename "$f" .json) $(cat "$f")"
     mv "$f" "$f.claimed"
   done
   sleep 1
 done
 ```
 
-Description: "plan feedback inbox". The `mv` to `.claimed` prevents duplicate events. Stale `.claimed` files or inbox files found at session start mean unprocessed feedback from earlier; process them the same way. Inbox filenames flatten the slug's `/` to `__` (e.g. `autotrader__status.json`); the real slug is in the file's `slug` field.
+Description: "plan feedback inbox". The event line carries the inbox JSON itself, so the `slug` and the `mode` (inline vs independent) are visible the moment the monitor fires, without reading the file. The `mv` to `.claimed` prevents duplicate events. Stale `.claimed` files or inbox files found at session start mean unprocessed feedback from earlier; process them the same way. Inbox filenames flatten the slug's `/` to `__` (e.g. `autotrader__status.json`); the real slug is in the file's `slug` field.
 
 ## 4. Process feedback when the monitor fires
 
@@ -61,7 +61,22 @@ Never restart, re-plan, or drop in-flight work because feedback arrived.
 
 **Check the inbox file's `mode` field before processing.** The page has a "Run independently" toggle; it stamps the inbox JSON with `"mode"`:
 
-- `"independent"`: do not process the batch in this context at all. Dispatch it with the Workflow tool (the toggle is Nikky's standing opt-in for a workflow here): a single-phase workflow, one agent for a normal batch or a pipeline over items for a large one, whose prompt names the slug, the claimed inbox file path, and the job: follow this section end to end (read the feedback file, view attached images, apply edits to the plan source, resolve or answer every submitted item, bump version and updated, delete the claimed inbox file). It runs in the background; continue your own task and relay the workflow's outcome in one line when its notification arrives.
+- `"independent"`: you MUST call the Workflow tool. Processing the batch in this session's context is wrong even if it seems quicker; the whole point of the toggle is keeping the main context untouched. The toggle is Nikky's standing opt-in for a workflow. Call it immediately with a minimal script (fill in `<slug>` and the claimed file path):
+
+  ```js
+  export const meta = { name: 'plan-feedback', description: 'Process plan review feedback batch', phases: [{ title: 'Process' }] }
+  phase('Process')
+  return await agent(`Process plan review feedback exactly per section 4 of
+  /Users/nikky.amresh/.claude/plan-server/skill/SKILL.md. Slug: <slug>.
+  Plan: /Users/nikky.amresh/.claude/plan-server/plans/<slug>.md
+  Feedback: /Users/nikky.amresh/.claude/plan-server/feedback/<slug>.json
+  Claimed inbox file to delete when done: <path>
+  Read attached images, apply edits, resolve or answer every submitted item
+  (resolution summaries or thread entries plus answered status), bump version
+  and updated. Return a one-line summary of what changed.`)
+  ```
+
+  Use a pipeline over items instead of the single agent only when the batch is large. The workflow runs in the background: continue your own task, and when its task notification arrives, relay the one-line outcome. Do not wait for it, poll it, or open the feedback file yourself.
 - `"inline"` or missing: process it in this session, subject to the triage rule above.
 
 Read the claimed inbox file to get the slug, then read `~/.claude/plan-server/feedback/<workspace>/<slug>.json`. For every item with `"status": "submitted"`:
