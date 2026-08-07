@@ -8,6 +8,7 @@ in inbox/ when the user submits a batch so Claude can pick it up.
 Stdlib only. Run: python3 server.py [--port 4747]
 """
 import argparse
+import base64
 import json
 import os
 import re
@@ -21,11 +22,22 @@ PLANS_DIR = os.path.join(ROOT, "plans")
 FEEDBACK_DIR = os.path.join(ROOT, "feedback")
 INBOX_DIR = os.path.join(ROOT, "inbox")
 VENDOR_DIR = os.path.join(ROOT, "vendor")
+UPLOADS_DIR = os.path.join(ROOT, "uploads")
 
 LOCK = threading.RLock()
 
-for d in (PLANS_DIR, FEEDBACK_DIR, INBOX_DIR, VENDOR_DIR):
+for d in (PLANS_DIR, FEEDBACK_DIR, INBOX_DIR, VENDOR_DIR, UPLOADS_DIR):
     os.makedirs(d, exist_ok=True)
+
+IMAGE_TYPES = {"image/png": "png", "image/jpeg": "jpg",
+               "image/webp": "webp", "image/gif": "gif"}
+
+
+def clean_image_urls(value):
+    if not isinstance(value, list):
+        return []
+    return [u for u in value
+            if isinstance(u, str) and re.match(r"^/uploads/[\w.-]+$", u)]
 
 
 def parse_front_matter(text):
@@ -59,7 +71,8 @@ def inbox_file(slug):
     return os.path.join(INBOX_DIR, slug.replace("/", "__") + ".json")
 
 
-COMPACT_DROP = ("prefix", "suffix", "comment", "suggested_text", "thread", "reply")
+COMPACT_DROP = ("prefix", "suffix", "comment", "suggested_text", "thread", "reply",
+                "images")
 
 
 def compact_resolved(data):
@@ -272,6 +285,11 @@ class Handler(BaseHTTPRequestHandler):
         if path.startswith("/vendor/"):
             name = os.path.basename(path)
             return self.send_file(os.path.join(VENDOR_DIR, name), "application/javascript")
+        if path.startswith("/uploads/"):
+            name = os.path.basename(path)
+            ext = name.rsplit(".", 1)[-1].lower()
+            ctype = {v: k for k, v in IMAGE_TYPES.items()}.get(ext, "application/octet-stream")
+            return self.send_file(os.path.join(UPLOADS_DIR, name), ctype)
         if path.startswith("/plan/"):
             return self.send_file(os.path.join(ROOT, "viewer.html"), "text/html")
         if path.startswith("/api/plan/"):
@@ -303,12 +321,32 @@ class Handler(BaseHTTPRequestHandler):
                 save_feedback(slug, data)
             return self.send_json({"ok": True})
 
+        if len(parts) >= 3 and parts[:2] == ["api", "upload"]:
+            slug = safe_slug("/".join(parts[2:]))
+            body = self.read_body()
+            m = re.match(r"^data:(image/(?:png|jpeg|webp|gif));base64,(.+)$",
+                         body.get("data") or "", re.DOTALL)
+            if not m:
+                return self.send_json({"error": "expected a base64 image data url"}, 400)
+            if len(m.group(2)) > 15_000_000:
+                return self.send_json({"error": "image too large"}, 413)
+            raw = base64.b64decode(m.group(2))
+            name = "%s__%d-%s.%s" % (slug.replace("/", "__"), int(time.time() * 1000),
+                                     os.urandom(2).hex(), IMAGE_TYPES[m.group(1)])
+            with open(os.path.join(UPLOADS_DIR, name), "wb") as f:
+                f.write(raw)
+            return self.send_json({"ok": True, "url": "/uploads/" + name})
+
         if len(parts) >= 3 and parts[:2] == ["api", "feedback"]:
             slug = safe_slug("/".join(parts[2:]))
             item = self.read_body()
             allowed = {"type", "quote", "prefix", "suffix", "section",
-                       "comment", "suggested_text"}
+                       "comment", "suggested_text", "images"}
             item = {k: v for k, v in item.items() if k in allowed}
+            if "images" in item:
+                item["images"] = clean_image_urls(item["images"])
+                if not item["images"]:
+                    del item["images"]
             with LOCK:
                 data = load_feedback(slug)
                 item["id"] = "fb%d" % int(time.time() * 1000)
@@ -322,15 +360,18 @@ class Handler(BaseHTTPRequestHandler):
             slug = safe_slug("/".join(parts[2:]))
             body = self.read_body()
             text = (body.get("text") or "").strip()
-            if not text:
+            if not text and not clean_image_urls(body.get("images")):
                 return self.send_json({"error": "empty reply"}, 400)
             with LOCK:
                 data = load_feedback(slug)
                 hit = False
                 for i in data["items"]:
                     if i.get("id") == body.get("id"):
-                        i.setdefault("thread", []).append(
-                            {"who": "user", "text": text, "at": time.time()})
+                        msg = {"who": "user", "text": text, "at": time.time()}
+                        images = clean_image_urls(body.get("images"))
+                        if images:
+                            msg["images"] = images
+                        i.setdefault("thread", []).append(msg)
                         i["status"] = "submitted"
                         hit = True
                 if hit:
