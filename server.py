@@ -22,7 +22,7 @@ FEEDBACK_DIR = os.path.join(ROOT, "feedback")
 INBOX_DIR = os.path.join(ROOT, "inbox")
 VENDOR_DIR = os.path.join(ROOT, "vendor")
 
-LOCK = threading.Lock()
+LOCK = threading.RLock()
 
 for d in (PLANS_DIR, FEEDBACK_DIR, INBOX_DIR, VENDOR_DIR):
     os.makedirs(d, exist_ok=True)
@@ -59,11 +59,36 @@ def inbox_file(slug):
     return os.path.join(INBOX_DIR, slug.replace("/", "__") + ".json")
 
 
+COMPACT_DROP = ("prefix", "suffix", "comment", "suggested_text", "thread", "reply")
+
+
+def compact_resolved(data):
+    """Resolved items keep only a 1-2 line resolution; the trail is dropped so
+    feedback files stay small when the agent re-reads them."""
+    changed = False
+    for i in data.get("items", []):
+        if i.get("status") != "resolved":
+            continue
+        if not i.get("resolution"):
+            legacy = (i.get("reply") or i.get("comment") or "Resolved.").strip()
+            i["resolution"] = legacy[:280]
+            changed = True
+        for k in COMPACT_DROP:
+            if k in i:
+                del i[k]
+                changed = True
+    return changed
+
+
 def load_feedback(slug):
     path = feedback_file(slug)
-    if os.path.exists(path):
-        with open(path) as f:
-            return json.load(f)
+    with LOCK:
+        if os.path.exists(path):
+            with open(path) as f:
+                data = json.load(f)
+            if compact_resolved(data):
+                save_feedback(slug, data)
+            return data
     return {"items": []}
 
 
@@ -85,7 +110,7 @@ def list_plans():
             slug = rel[:-3].replace(os.sep, "/")
             with open(path) as f:
                 meta, _ = parse_front_matter(f.read())
-            counts = {"draft": 0, "submitted": 0, "resolved": 0}
+            counts = {"draft": 0, "submitted": 0, "answered": 0, "resolved": 0}
             for item in load_feedback(slug)["items"]:
                 counts[item.get("status", "draft")] = counts.get(item.get("status", "draft"), 0) + 1
             plans.append({
@@ -141,6 +166,8 @@ a.card:hover {{ border-color:var(--accent); }}
   .chip.rev {{ color:#fbbf24; }}
 }}
 .meta {{ color:var(--muted); font:12px ui-monospace, Menlo, monospace; margin-top:6px; }}
+.need {{ color:#dc2626; font-weight:600; }}
+@media (prefers-color-scheme: dark) {{ .need {{ color:#f87171; }} }}
 .empty {{ color:var(--muted); font-style:italic; }}
 h2.ws {{ font:13px ui-monospace, Menlo, monospace; text-transform:uppercase;
          letter-spacing:.08em; color:var(--accent); margin:28px 0 10px;
@@ -177,6 +204,9 @@ def render_index(port):
             for p in items:
                 c = p["counts"]
                 fb = "%d draft, %d waiting, %d resolved" % (c["draft"], c["submitted"], c["resolved"])
+                if c.get("answered"):
+                    fb = ('<span class="need">%d awaiting your reply</span> &middot; '
+                          % c["answered"]) + fb
                 rows += (
                     '<a class="card" href="/plan/%s">'
                     '<div class="trow"><div class="t">%s</div>'
@@ -287,6 +317,27 @@ class Handler(BaseHTTPRequestHandler):
                 data["items"].append(item)
                 save_feedback(slug, data)
             return self.send_json({"ok": True, "id": item["id"]})
+
+        if len(parts) >= 3 and parts[:2] == ["api", "reply"]:
+            slug = safe_slug("/".join(parts[2:]))
+            body = self.read_body()
+            text = (body.get("text") or "").strip()
+            if not text:
+                return self.send_json({"error": "empty reply"}, 400)
+            with LOCK:
+                data = load_feedback(slug)
+                hit = False
+                for i in data["items"]:
+                    if i.get("id") == body.get("id"):
+                        i.setdefault("thread", []).append(
+                            {"who": "user", "text": text, "at": time.time()})
+                        i["status"] = "submitted"
+                        hit = True
+                if hit:
+                    save_feedback(slug, data)
+                    with open(inbox_file(slug), "w") as f:
+                        json.dump({"slug": slug, "count": 1, "at": time.time()}, f)
+            return self.send_json({"ok": hit})
 
         if len(parts) >= 3 and parts[:2] == ["api", "submit"]:
             slug = safe_slug("/".join(parts[2:]))

@@ -11,6 +11,7 @@
   --paper:#faf8f3; --surface:#ffffff; --ink:#22252e; --muted:#6c7180;
   --accent:#b45309; --accent-soft:rgba(180,83,9,.10);
   --hl:rgba(250,204,21,.32); --hl-resolved:rgba(34,197,94,.18);
+  --hl-answered:rgba(220,38,38,.14); --red:#dc2626;
   --green:#15803d; --line:#e5e1d8; --shadow:0 8px 28px rgba(30,30,40,.12);
 }
 @media (prefers-color-scheme: dark) {
@@ -18,6 +19,7 @@
     --paper:#14161c; --surface:#1c1f27; --ink:#e8e6e1; --muted:#9aa0ad;
     --accent:#f59e0b; --accent-soft:rgba(245,158,11,.12);
     --hl:rgba(250,204,21,.20); --hl-resolved:rgba(34,197,94,.16);
+    --hl-answered:rgba(248,113,113,.18); --red:#f87171;
     --green:#4ade80; --line:#2a2e38; --shadow:0 8px 28px rgba(0,0,0,.45);
   }
 }
@@ -87,6 +89,8 @@ mark.fb { border-radius:3px; padding:0 1px; cursor:pointer;
           border-bottom:2px solid rgba(217,119,6,.75); }
 mark.fb.resolved { background:var(--hl-resolved);
                    border-bottom-color:rgba(34,197,94,.6); }
+mark.fb.answered { background:var(--hl-answered);
+                   border-bottom-color:rgba(220,38,38,.7); }
 mark.fb.flash { outline:2px solid var(--accent); }
 
 #rail {
@@ -111,6 +115,9 @@ mark.fb.flash { outline:2px solid var(--accent); }
         border:1px solid var(--line); color:var(--muted); }
 .chip.edit { color:var(--accent); border-color:var(--accent); }
 .chip.resolved { color:var(--green); border-color:var(--green); }
+.chip.answered { color:var(--red); border-color:var(--red); }
+.item.answered { border-color:var(--red); }
+#rail h2.attn { color:var(--red); }
 .item .sec { font-size:11px; color:var(--muted); margin-left:auto;
              overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:150px; }
 .item .quote { font:13px/1.45 Charter, Georgia, serif; font-style:italic;
@@ -122,11 +129,23 @@ mark.fb.flash { outline:2px solid var(--accent); }
 .item .prop { background:var(--accent-soft); border-radius:6px; padding:6px 8px;
               margin-top:6px; font:12.5px ui-monospace, Menlo, monospace;
               white-space:pre-wrap; }
-.item .reply { border-top:1px dashed var(--line); margin-top:8px; padding-top:8px;
-               white-space:pre-wrap; }
-.item .reply .who { font:10px ui-monospace, Menlo, monospace;
-                    text-transform:uppercase; letter-spacing:.08em;
-                    color:var(--green); display:block; margin-bottom:3px; }
+.item .msg { border-top:1px dashed var(--line); margin-top:8px; padding-top:8px;
+             white-space:pre-wrap; }
+.item .msg .who { font:10px ui-monospace, Menlo, monospace;
+                  text-transform:uppercase; letter-spacing:.08em;
+                  color:var(--green); display:block; margin-bottom:3px; }
+.item .msg .who.user { color:var(--accent); }
+.item .res { border-top:1px dashed var(--line); margin-top:8px; padding-top:8px;
+             color:var(--muted); font-style:italic; white-space:pre-wrap; }
+.item .res .who { font:10px ui-monospace, Menlo, monospace; font-style:normal;
+                  text-transform:uppercase; letter-spacing:.08em;
+                  color:var(--green); display:block; margin-bottom:3px; }
+.replybox { margin-top:8px; display:flex; flex-direction:column; gap:6px; }
+.replybox textarea { width:100%; min-height:48px; resize:vertical;
+                     background:var(--surface); color:var(--ink);
+                     border:1px solid var(--line); border-radius:6px; padding:7px;
+                     font:13px -apple-system, sans-serif; }
+.replybox button { align-self:flex-end; padding:6px 12px; font-size:13px; }
 .item .rm { float:right; border:0; background:none; color:var(--muted);
             cursor:pointer; font-size:14px; padding:0 2px; }
 .item .rm:hover { color:#dc2626; }
@@ -314,7 +333,8 @@ function applyHighlights() {
       range.setStart(node, idx);
       range.setEnd(node, idx + q.length);
       const mark = document.createElement('mark');
-      mark.className = 'fb' + (item.status === 'resolved' ? ' resolved' : '');
+      mark.className = 'fb' + (item.status === 'resolved' ? ' resolved'
+                             : item.status === 'answered' ? ' answered' : '');
       mark.dataset.id = item.id;
       try { range.surroundContents(mark); } catch (e) {}
       break;
@@ -323,14 +343,15 @@ function applyHighlights() {
 }
 
 function renderFeedback() {
-  const groups = {draft:[], submitted:[], resolved:[]};
+  const groups = {draft:[], submitted:[], answered:[], resolved:[]};
   for (const i of state.fb.items) (groups[i.status] || groups.draft).push(i);
   let html = '';
-  const section = (label, arr) => {
+  const section = (label, arr, cls) => {
     if (!arr.length) return;
-    html += '<h2>' + label + '</h2>';
+    html += '<h2 class="' + (cls || '') + '">' + label + '</h2>';
     for (const i of arr) html += itemCard(i);
   };
+  section('Needs your reply', groups.answered, 'attn');
   section('Drafts', groups.draft);
   section('Waiting for Claude', groups.submitted);
   section('Resolved', groups.resolved.slice().reverse());
@@ -343,10 +364,12 @@ function renderFeedback() {
 }
 
 function itemCard(i) {
-  let h = '<div class="item" data-id="' + i.id + '"><div class="head">';
-  h += '<span class="chip ' + (i.status === 'resolved' ? 'resolved' : esc(i.type)) + '">'
-     + (i.status === 'resolved' ? 'resolved' : i.type === 'edit' ? 'edit' : 'comment')
-     + '</span>';
+  const answered = i.status === 'answered';
+  let h = '<div class="item' + (answered ? ' answered' : '') + '" data-id="' + i.id + '"><div class="head">';
+  const chip = i.status === 'resolved' ? ['resolved', 'resolved']
+             : answered ? ['answered', 'needs reply']
+             : [esc(i.type), i.type === 'edit' ? 'edit' : 'comment'];
+  h += '<span class="chip ' + chip[0] + '">' + chip[1] + '</span>';
   if (i.section) h += '<span class="sec">' + esc(i.section) + '</span>';
   if (i.status === 'draft')
     h += '<button class="rm" title="Remove draft" data-rm="' + i.id + '">&times;</button>';
@@ -355,8 +378,17 @@ function itemCard(i) {
   if (i.comment) h += '<div class="body">' + esc(i.comment) + '</div>';
   if (i.type === 'edit' && i.suggested_text)
     h += '<div class="prop">' + esc(i.suggested_text) + '</div>';
-  if (i.reply)
-    h += '<div class="reply"><span class="who">Claude</span>' + esc(i.reply) + '</div>';
+  if (i.status === 'resolved' && i.resolution) {
+    h += '<div class="res"><span class="who">Resolved</span>' + esc(i.resolution) + '</div>';
+  } else {
+    const thread = (i.reply ? [{who:'claude', text:i.reply}] : []).concat(i.thread || []);
+    for (const m of thread)
+      h += '<div class="msg"><span class="who' + (m.who === 'user' ? ' user' : '') + '">'
+         + (m.who === 'user' ? 'You' : 'Claude') + '</span>' + esc(m.text) + '</div>';
+  }
+  if (answered)
+    h += '<div class="replybox"><textarea placeholder="Answer Claude&hellip;" data-reply="'
+       + i.id + '"></textarea><button class="primary" data-send="' + i.id + '">Reply</button></div>';
   return h + '</div>';
 }
 
@@ -372,6 +404,7 @@ async function refresh() {
   const fbRaw = JSON.stringify(fb);
   const fbChanged = fbRaw !== state.fbRaw;
   if (state.formOpen) return;
+  if (document.activeElement && itemsEl.contains(document.activeElement)) return;
   if (planChanged) {
     const y = window.scrollY;
     const oldV = state.plan && state.plan.meta.version;
@@ -504,6 +537,20 @@ itemsEl.addEventListener('click', async e => {
     refresh();
     return;
   }
+  const send = e.target.closest('[data-send]');
+  if (send) {
+    const ta = itemsEl.querySelector('textarea[data-reply="' + send.dataset.send + '"]');
+    const text = ta ? ta.value.trim() : '';
+    if (!text) { toast('Write a reply first'); return; }
+    try {
+      ta.blur();
+      await api('/api/reply/' + slug, {id: send.dataset.send, text});
+      toast('Reply sent to Claude');
+      refresh();
+    } catch (err) { toast('Could not send: ' + err.message); }
+    return;
+  }
+  if (e.target.closest('.replybox')) return;
   const card = e.target.closest('.item');
   if (!card) return;
   const mark = docEl.querySelector('mark.fb[data-id="' + card.dataset.id + '"]');
