@@ -146,6 +146,16 @@ mark.fb.flash { outline:2px solid var(--accent); }
                      border:1px solid var(--line); border-radius:6px; padding:7px;
                      font:13px -apple-system, sans-serif; }
 .replybox button { align-self:flex-end; padding:6px 12px; font-size:13px; }
+
+.thumbs { display:flex; gap:6px; flex-wrap:wrap; margin-top:6px; }
+.thumbs:empty { display:none; }
+.thumbs .tw { position:relative; }
+.thumbs img { height:64px; max-width:160px; object-fit:cover; display:block;
+              border:1px solid var(--line); border-radius:6px; cursor:zoom-in; }
+.thumbs .tx { position:absolute; top:-6px; right:-6px; width:18px; height:18px;
+              border-radius:50%; border:0; background:var(--ink); color:var(--paper);
+              font-size:11px; line-height:18px; padding:0; cursor:pointer; }
+.imghint { font-size:11px; color:var(--muted); margin-top:6px; }
 .item .rm { float:right; border:0; background:none; color:var(--muted);
             cursor:pointer; font-size:14px; padding:0 2px; }
 .item .rm:hover { color:#dc2626; }
@@ -262,6 +272,8 @@ button.ghost:hover { color:var(--accent); border-color:var(--accent); }
   </div>
   <label id="p-notelabel">Comment</label>
   <textarea id="p-note" placeholder="What should change, or what do you want to know?"></textarea>
+  <div class="thumbs" id="p-imgs"></div>
+  <div class="imghint">Paste or drop screenshots to attach</div>
   <div class="row">
     <button class="ghost" id="p-cancel">Cancel</button>
     <button class="primary" id="p-save">Save draft</button>
@@ -276,7 +288,8 @@ const docEl = document.getElementById('doc');
 const itemsEl = document.getElementById('items');
 const seltool = document.getElementById('seltool');
 const popover = document.getElementById('popover');
-const state = { plan:null, fbRaw:'', fb:{items:[]}, formOpen:false, formType:null, sel:null };
+const state = { plan:null, fbRaw:'', fb:{items:[]}, formOpen:false, formType:null,
+                sel:null, images:[], replyImgs:{} };
 
 const esc = s => (s||'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
@@ -394,19 +407,101 @@ function itemCard(i) {
   if (i.comment) h += '<div class="body">' + esc(i.comment) + '</div>';
   if (i.type === 'edit' && i.suggested_text)
     h += '<div class="prop">' + esc(i.suggested_text) + '</div>';
+  if (i.images) h += thumbRow(i.images);
   if (i.status === 'resolved' && i.resolution) {
     h += '<div class="res"><span class="who">Resolved</span>' + esc(i.resolution) + '</div>';
   } else {
     const thread = (i.reply ? [{who:'claude', text:i.reply}] : []).concat(i.thread || []);
-    for (const m of thread)
+    for (const m of thread) {
       h += '<div class="msg"><span class="who' + (m.who === 'user' ? ' user' : '') + '">'
-         + (m.who === 'user' ? 'You' : 'Claude') + '</span>' + esc(m.text) + '</div>';
+         + (m.who === 'user' ? 'You' : 'Claude') + '</span>' + esc(m.text);
+      if (m.images) h += thumbRow(m.images);
+      h += '</div>';
+    }
   }
   if (answered)
-    h += '<div class="replybox"><textarea placeholder="Answer Claude&hellip;" data-reply="'
-       + i.id + '"></textarea><button class="primary" data-send="' + i.id + '">Reply</button></div>';
+    h += '<div class="replybox"><textarea placeholder="Answer Claude&hellip; (paste screenshots too)" data-reply="'
+       + i.id + '"></textarea><div class="thumbs" data-thumbs="' + i.id + '">'
+       + (state.replyImgs[i.id] || []).map(u => '<span class="tw"><img src="' + esc(u) + '"></span>').join('')
+       + '</div><button class="primary" data-send="' + i.id + '">Reply</button></div>';
   return h + '</div>';
 }
+
+function thumbRow(urls) {
+  return '<div class="thumbs">' + urls.map(u =>
+    '<span class="tw"><img src="' + esc(u) + '"></span>').join('') + '</div>';
+}
+
+/* ---------- image attachments ---------- */
+
+function imageFiles(dt) {
+  const out = [];
+  for (const it of (dt && dt.items) || [])
+    if (it.kind === 'file' && it.type.startsWith('image/')) out.push(it.getAsFile());
+  return out;
+}
+
+function uploadImage(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => api('/api/upload/' + slug, {data: r.result}).then(j => res(j.url), rej);
+    r.onerror = rej;
+    r.readAsDataURL(file);
+  });
+}
+
+function renderFormImgs() {
+  document.getElementById('p-imgs').innerHTML = state.images.map((u, i) =>
+    '<span class="tw"><img src="' + esc(u) + '"><button class="tx" data-imgrm="'
+    + i + '">&times;</button></span>').join('');
+}
+
+document.getElementById('p-imgs').onclick = e => {
+  const b = e.target.closest('[data-imgrm]');
+  if (b) { state.images.splice(+b.dataset.imgrm, 1); renderFormImgs(); }
+};
+
+function stageFormImages(files) {
+  files.forEach(f => uploadImage(f).then(u => { state.images.push(u); renderFormImgs(); },
+                                         () => toast('Upload failed')));
+}
+
+function stageReplyImages(id, files) {
+  files.forEach(f => uploadImage(f).then(u => {
+    (state.replyImgs[id] = state.replyImgs[id] || []).push(u);
+    const el = itemsEl.querySelector('[data-thumbs="' + id + '"]');
+    if (el) el.innerHTML = state.replyImgs[id].map(x =>
+      '<span class="tw"><img src="' + esc(x) + '"></span>').join('');
+  }, () => toast('Upload failed')));
+}
+
+document.addEventListener('paste', e => {
+  const files = imageFiles(e.clipboardData);
+  if (!files.length) return;
+  if (state.formOpen) { e.preventDefault(); stageFormImages(files); return; }
+  const ta = document.activeElement;
+  if (ta && ta.matches && ta.matches('textarea[data-reply]')) {
+    e.preventDefault();
+    stageReplyImages(ta.dataset.reply, files);
+  }
+});
+
+popover.addEventListener('dragover', e => { if (state.formOpen) e.preventDefault(); });
+popover.addEventListener('drop', e => {
+  if (!state.formOpen) return;
+  e.preventDefault();
+  stageFormImages(imageFiles(e.dataTransfer));
+});
+itemsEl.addEventListener('dragover', e => {
+  if (e.target.closest('.replybox')) e.preventDefault();
+});
+itemsEl.addEventListener('drop', e => {
+  const box = e.target.closest('.replybox');
+  if (!box) return;
+  e.preventDefault();
+  stageReplyImages(box.querySelector('textarea[data-reply]').dataset.reply,
+                   imageFiles(e.dataTransfer));
+});
 
 /* ---------- polling ---------- */
 
@@ -474,6 +569,8 @@ document.addEventListener('mouseup', e => {
 function openForm(type) {
   state.formOpen = true;
   state.formType = type;
+  state.images = [];
+  renderFormImgs();
   seltool.hidden = true;
   const s = state.sel;
   document.getElementById('p-quote').textContent = s.quote ? '“' + s.quote + '”' : 'General note on the whole plan';
@@ -518,10 +615,10 @@ document.getElementById('p-save').onclick = async () => {
   const s = state.sel;
   const note = document.getElementById('p-note').value.trim();
   const replace = document.getElementById('p-replace').value;
-  if (state.formType === 'comment' && !note) {
-    toast('Write a comment first'); return;
+  if (state.formType === 'comment' && !note && !state.images.length) {
+    toast('Write a comment or attach a screenshot first'); return;
   }
-  if (state.formType === 'edit' && replace === s.quote && !note) {
+  if (state.formType === 'edit' && replace === s.quote && !note && !state.images.length) {
     toast('Change the text or add a note'); return;
   }
   const body = {
@@ -529,6 +626,7 @@ document.getElementById('p-save').onclick = async () => {
     prefix: s.prefix, suffix: s.suffix, comment: note
   };
   if (state.formType === 'edit') body.suggested_text = replace;
+  if (state.images.length) body.images = state.images;
   try {
     await api('/api/feedback/' + slug, body);
     closeForm();
@@ -561,16 +659,22 @@ itemsEl.addEventListener('click', async e => {
   if (send) {
     const ta = itemsEl.querySelector('textarea[data-reply="' + send.dataset.send + '"]');
     const text = ta ? ta.value.trim() : '';
-    if (!text) { toast('Write a reply first'); return; }
+    if (!text && !(state.replyImgs[send.dataset.send] || []).length) {
+      toast('Write a reply or attach a screenshot first'); return;
+    }
     try {
       ta.blur();
       await api('/api/reply/' + slug, {id: send.dataset.send, text,
+                                       images: state.replyImgs[send.dataset.send] || [],
                                        independent: document.getElementById('bgmode').checked});
+      delete state.replyImgs[send.dataset.send];
       toast('Reply sent to Claude');
       refresh();
     } catch (err) { toast('Could not send: ' + err.message); }
     return;
   }
+  const img = e.target.closest('.thumbs img');
+  if (img) { window.open(img.src); return; }
   if (e.target.closest('.replybox')) return;
   const card = e.target.closest('.item');
   if (!card) return;

@@ -9,3 +9,6 @@ plans/**
 
 __pycache__/
 .DS_Store
+
+# Screenshots attached to feedback stay local
+uploads/

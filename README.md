@@ -23,6 +23,7 @@ feedback/<workspace>/*.json comments and suggested edits, statuses draft/submitt
                             keep a 1-2 line resolution summary instead of the trail
 inbox/*.json                signal files written on submit, claimed by the Claude session
                             (flat; slug slashes become __, real slug is inside the JSON)
+uploads/         screenshots pasted or dropped onto feedback (flat files, served at /uploads/)
 vendor/          marked.min.js, mermaid.min.js
 ```
 
@@ -47,8 +48,10 @@ GET  /api/feedback/<slug>     {items: [...]}
 POST /api/feedback/<slug>     add draft {type, quote, section, prefix, suffix, comment, suggested_text}
 POST /api/feedback/<slug>/delete   {id} remove a draft
 POST /api/submit/<slug>       {independent?} drafts -> submitted, writes inbox/<workspace>__<name>.json
-POST /api/reply/<slug>        {id, text, independent?} user reply on an answered item -> back to
-                              submitted, appends to its thread and writes an inbox file
+POST /api/reply/<slug>        {id, text, images?, independent?} user reply on an answered item ->
+                              back to submitted, appends to its thread and writes an inbox file
+POST /api/upload/<slug>       {data: base64 image data url} -> {url: /uploads/<file>}; feedback
+                              items and replies reference these in an images array
 
 Inbox files carry "mode": "independent" | "inline" from the page's Run independently
 toggle; independent batches are handed to a background agent by the Claude session.
