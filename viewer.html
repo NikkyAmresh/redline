@@ -162,6 +162,18 @@ button.ghost {
 }
 button.ghost:hover { color:var(--accent); border-color:var(--accent); }
 
+.switch { display:flex; align-items:center; gap:8px; color:var(--muted);
+          font-size:12.5px; cursor:pointer; user-select:none; }
+.switch input { display:none; }
+.switch .track { width:30px; height:18px; border-radius:999px; background:var(--line);
+                 position:relative; transition:background .15s; flex:none; }
+.switch .track::after { content:''; position:absolute; top:2px; left:2px;
+                        width:14px; height:14px; border-radius:50%;
+                        background:var(--surface); transition:left .15s;
+                        box-shadow:0 1px 2px rgba(0,0,0,.25); }
+.switch input:checked + .track { background:var(--accent); }
+.switch input:checked + .track::after { left:14px; }
+
 #seltool {
   position:absolute; z-index:30; display:flex; gap:1px;
   background:var(--ink); border-radius:8px; box-shadow:var(--shadow);
@@ -228,6 +240,10 @@ button.ghost:hover { color:var(--accent); border-color:var(--accent); }
     <div id="hint">Select any passage in the plan to comment on it or suggest an edit.
       Drafts collect here; send them to Claude in one batch.</div>
     <button class="ghost" id="general">+ General note (no selection)</button>
+    <label class="switch" title="Claude hands this batch to a background agent and keeps its own task going, instead of fixing everything in the main context">
+      <input type="checkbox" id="bgmode"><span class="track"></span>
+      Run independently (background agent)
+    </label>
     <button class="primary" id="submit" disabled>Send to Claude</button>
     <div id="items"></div>
   </aside>
@@ -521,9 +537,13 @@ document.getElementById('p-save').onclick = async () => {
   } catch (e) { toast('Could not save: ' + e.message); }
 };
 
+const bgmode = document.getElementById('bgmode');
+bgmode.checked = localStorage.getItem('plan-bgmode') === '1';
+bgmode.onchange = () => localStorage.setItem('plan-bgmode', bgmode.checked ? '1' : '0');
+
 document.getElementById('submit').onclick = async () => {
   try {
-    const r = await api('/api/submit/' + slug, {});
+    const r = await api('/api/submit/' + slug, {independent: bgmode.checked});
     toast('Sent ' + r.submitted + ' item' + (r.submitted === 1 ? '' : 's')
           + ' to Claude. It is watching the inbox.');
     refresh();
@@ -544,7 +564,8 @@ itemsEl.addEventListener('click', async e => {
     if (!text) { toast('Write a reply first'); return; }
     try {
       ta.blur();
-      await api('/api/reply/' + slug, {id: send.dataset.send, text});
+      await api('/api/reply/' + slug, {id: send.dataset.send, text,
+                                       independent: document.getElementById('bgmode').checked});
       toast('Reply sent to Claude');
       refresh();
     } catch (err) { toast('Could not send: ' + err.message); }

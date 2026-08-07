@@ -46,9 +46,12 @@ GET  /api/plan/<slug>         {slug, meta, markdown, mtime}
 GET  /api/feedback/<slug>     {items: [...]}
 POST /api/feedback/<slug>     add draft {type, quote, section, prefix, suffix, comment, suggested_text}
 POST /api/feedback/<slug>/delete   {id} remove a draft
-POST /api/submit/<slug>       drafts -> submitted, writes inbox/<workspace>__<name>.json
-POST /api/reply/<slug>        {id, text} user reply on an answered item -> back to submitted,
-                              appends to its thread and writes an inbox file
+POST /api/submit/<slug>       {independent?} drafts -> submitted, writes inbox/<workspace>__<name>.json
+POST /api/reply/<slug>        {id, text, independent?} user reply on an answered item -> back to
+                              submitted, appends to its thread and writes an inbox file
+
+Inbox files carry "mode": "independent" | "inline" from the page's Run independently
+toggle; independent batches are handed to a background agent by the Claude session.
 ```
 
 The Claude side of the workflow is documented in `skill/SKILL.md`.

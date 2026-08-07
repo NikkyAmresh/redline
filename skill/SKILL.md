@@ -59,6 +59,11 @@ Description: "plan feedback inbox". The `mv` to `.claimed` prevents duplicate ev
 
 Never restart, re-plan, or drop in-flight work because feedback arrived.
 
+**Check the inbox file's `mode` field before processing.** The page has a "Run independently" toggle; it stamps the inbox JSON with `"mode"`:
+
+- `"independent"`: do not process the batch in this context at all. Launch a background agent (Agent tool, `general-purpose`) whose prompt names the slug, the claimed inbox file path, and the job: follow this section end to end (read the feedback file, apply edits to the plan source, resolve or answer every submitted item, bump version and updated, delete the claimed inbox file). Continue your own task while it runs; when it reports back, relay the outcome to the user in one line.
+- `"inline"` or missing: process it in this session, subject to the triage rule above.
+
 Read the claimed inbox file to get the slug, then read `~/.claude/plan-server/feedback/<workspace>/<slug>.json`. For every item with `"status": "submitted"`:
 
 - Items carry: `type` (comment or edit), `quote` (the selected text as rendered, so markdown syntax like `**` or backticks is stripped), `section` (nearest heading), `prefix`/`suffix` (surrounding rendered text), `comment`, for edits `suggested_text`, and possibly a `thread` array of `{who, text, at}` messages if the item has been discussed before (`who` is `user` or `claude`).
