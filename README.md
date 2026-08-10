@@ -1,14 +1,14 @@
-# Plan Server
+# Redline
 
 Google-Docs-style plan review for Claude Code. Plans become versioned markdown pages in your browser, with mermaid diagrams, inline comments, and suggested edits that flow straight back into the Claude session that wrote them.
 
-**Site: [planserver.algofunds.in](https://planserver.algofunds.in)**
+**Site: [redline.algofunds.in](https://redline.algofunds.in)**
 
-![Plan Server viewer](docs/assets/viewer.png)
+![Redline viewer](docs/assets/viewer.png)
 
 ## Why not just plan mode?
 
-Standard plan mode prints a wall of text in the terminal and gives you one accept or reject. Plan Server gives you:
+Standard plan mode prints a wall of text in the terminal and gives you one accept or reject. Redline gives you:
 
 - **Real documents, not scrollback.** Plans are versioned markdown files per project workspace, rendered with mermaid diagrams, tables, and phase checklists.
 - **Review like a doc, not a diff.** Select any sentence and leave a comment or a suggested edit. Attach screenshots. When Claude has an open question, it becomes a thread on the exact passage.
@@ -19,7 +19,7 @@ Standard plan mode prints a wall of text in the terminal and gives you one accep
 ## Quick start
 
 ```bash
-git clone https://github.com/NikkyAmresh/claude-plan-server ~/.claude/plan-server
+git clone https://github.com/NikkyAmresh/redline ~/.claude/plan-server
 ln -s ../plan-server/skill ~/.claude/skills/plan-review
 python3 ~/.claude/plan-server/server.py     # http://localhost:4747
 ```
@@ -51,7 +51,7 @@ inbox/*.json ◀──on submit── server.py :4747 ◀──poll/POST── b
 server.py        http server: plans, feedback, submit, inbox signals (stdlib only)
 viewer.html      review UI: rendering, selection toolbar, review rail, polling
 skill/SKILL.md   the Claude Code skill driving the whole workflow
-docs/            landing page (GitHub Pages)
+docs/            landing page (redline.algofunds.in, a Cloudflare Worker serving static assets)
 plans/<workspace>/*.md       one plan per file, grouped by project workspace
 feedback/<workspace>/*.json  comments and edits; draft / submitted / answered / resolved
 inbox/*.json                 submit signals claimed by the Claude session
