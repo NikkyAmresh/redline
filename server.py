@@ -9,9 +9,11 @@ Stdlib only. Run: python3 server.py [--port 4747]
 """
 import argparse
 import base64
+import html
 import json
 import os
 import re
+import sys
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -25,6 +27,13 @@ VENDOR_DIR = os.path.join(ROOT, "vendor")
 UPLOADS_DIR = os.path.join(ROOT, "uploads")
 
 LOCK = threading.RLock()
+
+# The server is local-only by design. Rejecting foreign Host headers stops
+# DNS rebinding, where a malicious page resolves its own domain to 127.0.0.1
+# to read plans or post feedback through the visitor's browser.
+ALLOWED_HOSTS = {"localhost", "127.0.0.1", "[::1]"}
+
+MAX_BODY = 32 * 1024 * 1024  # fits a 15 MB image as a base64 JSON field
 
 for d in (PLANS_DIR, FEEDBACK_DIR, INBOX_DIR, VENDOR_DIR, UPLOADS_DIR):
     os.makedirs(d, exist_ok=True)
@@ -211,9 +220,10 @@ def render_index(port):
         groups = {}
         for p in plans:
             groups.setdefault(p["workspace"], []).append(p)
+        esc = html.escape
         rows = ""
         for ws, items in groups.items():
-            rows += '<h2 class="ws">%s</h2>' % (ws or "ungrouped")
+            rows += '<h2 class="ws">%s</h2>' % esc(ws or "ungrouped")
             for p in items:
                 c = p["counts"]
                 fb = "%d draft, %d waiting, %d resolved" % (c["draft"], c["submitted"], c["resolved"])
@@ -225,8 +235,8 @@ def render_index(port):
                     '<div class="trow"><div class="t">%s</div>'
                     '<span class="chip %s">%s</span></div>'
                     '<div class="meta">v%s &middot; updated %s &middot; %s</div></a>'
-                    % (p["slug"], p["title"], status_class(p["status"]), p["status"],
-                       p["version"], p["updated"], fb)
+                    % (esc(p["slug"]), esc(p["title"]), status_class(p["status"]),
+                       esc(p["status"]), esc(p["version"]), esc(p["updated"]), fb)
                 )
     return INDEX_TEMPLATE.format(port=port, rows=rows)
 
@@ -257,24 +267,43 @@ class Handler(BaseHTTPRequestHandler):
 
     def read_body(self):
         length = int(self.headers.get("Content-Length", 0))
+        if length > MAX_BODY:
+            raise ValueError("body too large")
         raw = self.rfile.read(length) if length else b"{}"
         return json.loads(raw or b"{}")
 
+    def host_allowed(self):
+        host = self.headers.get("Host") or ""
+        if host.startswith("["):  # IPv6 literal, e.g. [::1]:4747
+            host = host.split("]")[0] + "]"
+        else:
+            host = host.rsplit(":", 1)[0]
+        if host in ALLOWED_HOSTS:
+            return True
+        self.send_json({"error": "forbidden host"}, 403)
+        return False
+
     def do_GET(self):
         try:
-            self.route_get()
+            if self.host_allowed():
+                self.route_get()
         except BrokenPipeError:
             pass
-        except Exception as e:
-            self.send_json({"error": str(e)}, 500)
+        except Exception:
+            import traceback
+            traceback.print_exc(file=sys.stderr)
+            self.send_json({"error": "internal error"}, 500)
 
     def do_POST(self):
         try:
-            self.route_post()
+            if self.host_allowed():
+                self.route_post()
         except BrokenPipeError:
             pass
-        except Exception as e:
-            self.send_json({"error": str(e)}, 500)
+        except Exception:
+            import traceback
+            traceback.print_exc(file=sys.stderr)
+            self.send_json({"error": "internal error"}, 500)
 
     def route_get(self):
         path = self.path.split("?")[0]
