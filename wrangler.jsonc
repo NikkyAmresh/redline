@@ -1,0 +1,11 @@
+// Landing page only: serves docs/ at redline.algofunds.in as static assets.
+// The plan server itself (server.py) is local-only and is not deployed.
+{
+  "name": "redline",
+  "compatibility_date": "2026-08-01",
+  "assets": { "directory": "./docs" },
+  "observability": { "enabled": true },
+  "routes": [
+    { "pattern": "redline.algofunds.in", "custom_domain": true }
+  ]
+}

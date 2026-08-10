@@ -3,15 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Plan Server: review Claude's plans in the browser</title>
-<meta name="description" content="Plan Server turns Claude Code plans into versioned pages in your browser: mermaid diagrams, inline comments, suggested edits, and threads that land back in the session that wrote the plan.">
-<meta property="og:title" content="Plan Server: review Claude's plans in the browser">
+<title>Redline: review Claude's plans in the browser</title>
+<meta name="description" content="Redline turns Claude Code plans into versioned pages in your browser: mermaid diagrams, inline comments, suggested edits, and threads that land back in the session that wrote the plan.">
+<meta property="og:title" content="Redline: review Claude's plans in the browser">
 <meta property="og:description" content="Google-Docs-style plan review for Claude Code. One Python file, zero dependencies, everything on localhost.">
-<meta property="og:image" content="https://planserver.algofunds.in/assets/viewer.png">
-<meta property="og:url" content="https://planserver.algofunds.in">
+<meta property="og:image" content="https://redline.algofunds.in/assets/viewer.png">
+<meta property="og:url" content="https://redline.algofunds.in">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23f59e0b'/%3E%3Ctext x='32' y='45' font-family='Georgia,serif' font-size='38' font-weight='bold' text-anchor='middle' fill='%2314161c'%3EP%3C/text%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23f59e0b'/%3E%3Ctext x='32' y='45' font-family='Georgia,serif' font-size='38' font-weight='bold' text-anchor='middle' fill='%2314161c'%3ER%3C/text%3E%3C/svg%3E">
 <style>
 :root {
   --paper:#faf8f3; --surface:#fff; --ink:#22252e; --muted:#6c7180;
@@ -264,27 +264,27 @@ footer a:hover { color:var(--accent); }
 <body>
 
 <div class="bar">
-  <span class="crumb">Plans / <b>plan-server</b></span>
+  <span class="crumb">Plans / <b>redline</b></span>
   <span class="vchips"><span class="chip amber v1">V1</span><span class="chip amber v2">V2</span></span>
   <span class="chip green">shipped</span>
   <span class="live">LIVE</span>
 </div>
 
 <main>
-  <div class="fm"><span class="k">title:</span> Plan Server
+  <div class="fm"><span class="k">title:</span> Redline
 <span class="k">status:</span> open source, MIT
-<span class="k">repo:</span> github.com/NikkyAmresh/claude-plan-server</div>
+<span class="k">repo:</span> github.com/NikkyAmresh/redline</div>
 
-  <h1>Review Claude's plans in <span class="edit-old">the terminal</span> <span class="edit-new">your browser.</span></h1>
+  <h1>Redline Claude's plans in <span class="edit-old">the terminal</span> <span class="edit-new">your browser.</span></h1>
 
-  <p class="lede">Plan Server turns Claude Code plans into <b>versioned pages</b>: mermaid diagrams, <b>inline comments</b>, <b>suggested edits</b>, and threads that land back in the session that wrote the plan. One Python file, zero dependencies, everything on localhost.</p>
+  <p class="lede">Redline turns Claude Code plans into <b>versioned pages</b>: mermaid diagrams, <b>inline comments</b>, <b>suggested edits</b>, and threads that land back in the session that wrote the plan. One Python file, zero dependencies, everything on localhost.</p>
 
   <div class="cta">
-    <a class="btn" href="https://github.com/NikkyAmresh/claude-plan-server">View on GitHub</a>
+    <a class="btn" href="https://github.com/NikkyAmresh/redline">View on GitHub</a>
     <span class="ghost">MIT · Python stdlib · works offline</span>
   </div>
 
-  <pre class="code"><span class="p">$</span> git clone https://github.com/NikkyAmresh/claude-plan-server ~/.claude/plan-server
+  <pre class="code"><span class="p">$</span> git clone https://github.com/NikkyAmresh/redline ~/.claude/plan-server
 <span class="p">$</span> ln -s ../plan-server/skill ~/.claude/skills/plan-review
 <span class="p">$</span> python3 ~/.claude/plan-server/server.py   <span class="c"># http://localhost:4747</span></pre>
 </main>
@@ -292,7 +292,7 @@ footer a:hover { color:var(--accent); }
 <div class="wide shot">
   <div class="frame">
     <div class="head"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">localhost:4747/plan/plan-server/v1</span></div>
-    <img src="assets/viewer.png" width="3024" height="1890" alt="Plan Server viewer: a rendered plan with a mermaid sequence diagram on the left and a review rail on the right showing a thread that needs a reply, a draft comment, and a suggested edit">
+    <img src="assets/viewer.png" width="1512" height="945" alt="Redline viewer: a rendered plan with a mermaid sequence diagram on the left and a review rail on the right showing a thread that needs a reply, a draft comment, and a suggested edit">
   </div>
   <div class="cap">a real plan under review: diagrams on the left, your feedback rail on the right</div>
 </div>
@@ -333,7 +333,7 @@ footer a:hover { color:var(--accent); }
           <p>Add <mark class="fb">server.py with health, plan and feedback APIs</mark>, then wire the viewer to poll every 2.5s.</p>
           <div class="bubble"><span class="who">You · comment</span>Can we ship the inbox watcher first? I want the feedback path proven before the UI.</div>
         </div>
-        <div class="label">plan server: every sentence is a place to talk</div>
+        <div class="label">redline: every sentence is a place to talk</div>
       </div>
     </div>
   </section>
@@ -388,12 +388,12 @@ footer a:hover { color:var(--accent); }
   <section>
     <div class="eyebrow">Quick start</div>
     <h2>Three lines, then ask for a plan.</h2>
-    <pre class="code"><span class="p">$</span> git clone https://github.com/NikkyAmresh/claude-plan-server ~/.claude/plan-server
+    <pre class="code"><span class="p">$</span> git clone https://github.com/NikkyAmresh/redline ~/.claude/plan-server
 <span class="p">$</span> ln -s ../plan-server/skill ~/.claude/skills/plan-review
 <span class="p">$</span> python3 ~/.claude/plan-server/server.py   <span class="c"># http://localhost:4747</span></pre>
     <p style="margin-top:16px">Python 3.7+ and Claude Code, on macOS or Linux. Then ask any session for a plan, or say <b>/plan-review</b>. The bundled example plan is itself a live demo: select a sentence and send Claude a note.</p>
     <div class="cta">
-      <a class="btn" href="https://github.com/NikkyAmresh/claude-plan-server">View on GitHub</a>
+      <a class="btn" href="https://github.com/NikkyAmresh/redline">View on GitHub</a>
     </div>
   </section>
 </main>
@@ -401,7 +401,7 @@ footer a:hover { color:var(--accent); }
 <footer>
   <div class="in">
     <span>MIT · built by <a href="https://github.com/NikkyAmresh">Nikky Amresh</a></span>
-    <span>bundles <a href="https://github.com/markedjs/marked">marked</a> and <a href="https://github.com/mermaid-js/mermaid">mermaid</a> · this page is docs/ in the <a href="https://github.com/NikkyAmresh/claude-plan-server">repo</a></span>
+    <span>bundles <a href="https://github.com/markedjs/marked">marked</a> and <a href="https://github.com/mermaid-js/mermaid">mermaid</a> · this page is docs/ in the <a href="https://github.com/NikkyAmresh/redline">repo</a></span>
   </div>
 </footer>
 
