@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Plan</title>
+<title>Redline</title>
 <script src="/vendor/marked.min.js"></script>
 <script src="/vendor/mermaid.min.js"></script>
 <style>
@@ -236,7 +236,7 @@ button.ghost:hover { color:var(--accent); border-color:var(--accent); }
 <body>
 
 <header>
-  <a href="/">Plans</a><span style="color:var(--muted)">/</span>
+  <a href="/">Redline</a><span style="color:var(--muted)">/</span>
   <span id="title">&hellip;</span>
   <span class="pill version" id="version"></span>
   <span class="pill" id="pstatus"></span>
@@ -317,7 +317,7 @@ function setLive(on) {
 
 function renderPlan(plan) {
   document.getElementById('title').textContent = plan.meta.title || slug;
-  document.title = plan.meta.title || slug;
+  document.title = (plan.meta.title || slug) + ' · Redline';
   document.getElementById('version').textContent = 'v' + (plan.meta.version || '1');
   document.getElementById('pstatus').textContent = plan.meta.status || 'draft';
   docEl.innerHTML = marked.parse(plan.markdown);
