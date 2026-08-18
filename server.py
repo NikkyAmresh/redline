@@ -152,7 +152,7 @@ def list_plans():
 INDEX_TEMPLATE = """<!doctype html>
 <html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Plans</title>
+<title>Redline · plans</title>
 <style>
 :root {{
   --paper:#faf8f3; --surface:#fff; --ink:#22252e; --muted:#6c7180;
@@ -195,7 +195,7 @@ h2.ws {{ font:13px ui-monospace, Menlo, monospace; text-transform:uppercase;
          letter-spacing:.08em; color:var(--accent); margin:28px 0 10px;
          padding-bottom:6px; border-bottom:1px solid var(--line); }}
 </style></head><body><main>
-<h1>Plans</h1>
+<h1>Redline</h1>
 <div class="sub">plan review server, port {port}</div>
 {rows}
 </main></body></html>"""

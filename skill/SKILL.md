@@ -1,11 +1,11 @@
 ---
 name: plan-review
-description: Present implementation plans as HTML pages on the local plan server instead of long terminal output. Use whenever the user asks for a project or feature plan, design doc, phased roadmap, or architecture proposal, when they say /plan-review, or when plan feedback needs processing. Serves mermaid diagrams, collects inline comments and suggested edits in the browser, and routes submitted feedback back into the session.
+description: Present implementation plans as HTML pages on the local Redline plan server instead of long terminal output. Use whenever the user asks for a project or feature plan, design doc, phased roadmap, or architecture proposal, when they say /plan-review, or when plan feedback needs processing. Serves mermaid diagrams, collects inline comments and suggested edits in the browser, and routes submitted feedback back into the session.
 ---
 
-# Plan review server workflow
+# Redline: the plan review workflow
 
-The user does not want long plans printed in the terminal. Plans are written as markdown files, served at http://localhost:4747 by the plan server, reviewed in the browser, and revised through a feedback loop. Keep terminal output to a few lines; the plan lives in the browser.
+The user does not want long plans printed in the terminal. Plans are written as markdown files, served at http://localhost:4747 by Redline (the local plan server), reviewed in the browser, and revised through a feedback loop. Keep terminal output to a few lines; the plan lives in the browser.
 
 The server root is `~/.claude/plan-server` (the directory containing `server.py`; adjust every path below if it was cloned somewhere else). Use absolute paths when passing them to tools.
 
@@ -36,13 +36,13 @@ curl -sf http://localhost:4747/api/health >/dev/null 2>&1 \
 
 If down, start it with Bash `run_in_background`: `python3 ~/.claude/plan-server/server.py`. Then open `http://localhost:4747/plan/<workspace>/<slug>` in the browser (`open <url>` on macOS, `xdg-open <url>` on Linux, `start <url>` on Windows).
 
-## 3. Watch the inbox
+## 3. Watch the inbox (your workspace only)
 
-Arm a persistent watcher (one per session is enough, it covers all plans). Use the Monitor tool if your environment has it; otherwise run the same loop with Bash `run_in_background`:
+Arm a persistent watcher, one per session. **Scope it to your own workspace.** Several sessions can run in parallel and every submit lands in the same `inbox/` directory; a watcher that claims everything interrupts its session with other projects' feedback and steals events from the session that owns them. Inbox filenames start with the workspace (`<workspace>__<slug>.json`), so watch only the workspace(s) whose plans this session wrote, e.g. `autotrader__*.json`. Use the Monitor tool if your environment has it; otherwise run the same loop with Bash `run_in_background`:
 
 ```
 while true; do
-  for f in $(find ~/.claude/plan-server/inbox -maxdepth 1 -name '*.json' 2>/dev/null); do
+  for f in $(find ~/.claude/plan-server/inbox -maxdepth 1 -name '<workspace>__*.json' 2>/dev/null); do
     echo "FEEDBACK $(basename "$f" .json) $(cat "$f")"
     mv "$f" "$f.claimed"
   done
@@ -50,7 +50,9 @@ while true; do
 done
 ```
 
-Description: "plan feedback inbox". The event line carries the inbox JSON itself, so the `slug` and the `mode` (inline vs independent) are visible the moment the watcher fires, without reading the file. The `mv` to `.claimed` prevents duplicate events. Stale `.claimed` files or inbox files found at session start mean unprocessed feedback from earlier; process them the same way. Inbox filenames flatten the slug's `/` to `__` (e.g. `autotrader__status.json`); the real slug is in the file's `slug` field.
+Description: "plan feedback inbox (<workspace>)". The event line carries the inbox JSON itself, so the `slug` and the `mode` (inline vs independent) are visible the moment the watcher fires, without reading the file. The `mv` to `.claimed` prevents duplicate events. If this session writes plans in a second workspace later, re-arm the watcher with both prefixes.
+
+Stale `.claimed` files or inbox files **for your workspace** found at session start mean unprocessed feedback from earlier; process them the same way. Leave other workspaces' files alone; the session that owns them will claim them. Inbox filenames flatten the slug's `/` to `__` (e.g. `autotrader__status.json`); the real slug is in the file's `slug` field.
 
 ## 4. Process feedback when the watcher fires
 
