@@ -12,3 +12,6 @@ __pycache__/
 
 # Screenshots attached to feedback stay local
 uploads/
+
+# wrangler local state
+.wrangler/
