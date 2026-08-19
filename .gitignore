@@ -15,3 +15,12 @@ uploads/
 
 # wrangler local state
 .wrangler/
+node_modules
+.venv
+venv
+build
+dist
+.next
+.dart_tool
+__pycache__
+*.log
