@@ -27,6 +27,13 @@ Content guidelines:
 - Phase sections with `- [ ]` task checklists, a components table, and a risks or open questions section.
 - Follow any writing style preferences the user has expressed.
 
+`plans/` is a git repo (root at `~/.claude/plan-server`). After writing the file, commit it so v1 is a retrievable point in history, not just a number in the front matter:
+
+```
+git -C ~/.claude/plan-server add plans/<workspace>/<slug>.md
+git -C ~/.claude/plan-server commit -m "<workspace>/<slug>: v1"
+```
+
 ## 2. Serve and open
 
 ```
@@ -77,7 +84,8 @@ Never restart, re-plan, or drop in-flight work because feedback arrived.
   Claimed inbox file to delete when done: <path>
   Read attached images, apply edits, resolve or answer every submitted item
   (resolution summaries or thread entries plus answered status), bump version
-  and updated. Return a one-line summary of what changed.`)
+  and updated, then commit the plan file (git -C ~/.claude/plan-server add/commit,
+  see step 4). Return a one-line summary of what changed.`)
   ```
 
   Use a pipeline over items instead of the single agent only when the batch is large. If there is no Workflow tool, spawn a background subagent with the Agent tool using the same prompt. If neither exists, fall back to processing inline. A background run continues while you work on your own task; when its notification arrives, relay the one-line outcome. Do not wait for it, poll it, or open the feedback file yourself.
@@ -94,9 +102,22 @@ Read the claimed inbox file to get the slug, then read `~/.claude/plan-server/fe
   - Fully handled: set `"status": "resolved"` and write `"resolution"`: a 1-2 line summary of what was decided or changed. Delete the item's `"thread"` and legacy `"reply"` fields; resolved cards show only the summary, never the trail. The server also compacts resolved items automatically on load (drops comment, thread, prefix and suffix), so feedback files stay small; never re-read or reason over resolved items when processing new feedback, only items with `"status": "submitted"` matter.
   - Needs the user's answer (open question, a choice between options, an unclear ask): append `{"who": "claude", "text": "...", "at": <epoch seconds>}` to the item's `"thread"` array and set `"status": "answered"`. The page shows these in red under "Needs your reply" and the index flags the plan. When the user replies in the browser, the item flips back to `"submitted"` and a new inbox file appears, so the watcher loop picks the conversation up again.
 - Bump `version` and `updated` in the plan front matter. The browser polls every 2.5s and shows the new version plus replies automatically.
+- Commit the bump: `git -C ~/.claude/plan-server add plans/<workspace>/<slug>.md && git -C ~/.claude/plan-server commit -m "<workspace>/<slug>: v<N> - <what changed>"`. This is what makes the previous version recoverable; skipping it silently loses v<N-1>.
 - Delete the processed `inbox/<workspace>__<slug>.json.claimed` file.
 - Tell the user in one or two lines what changed; do not restate the plan in the terminal.
 
 ## 5. Implementation phase
 
-When the user approves, implement phase by phase and keep the plan current: tick `- [x]` boxes and bump the version as work lands, so the page doubles as a progress board.
+When the user approves, implement phase by phase and keep the plan current: tick `- [x]` boxes and bump the version as work lands, so the page doubles as a progress board. Commit after each bump the same way as step 4, so the progress-board history (which boxes were ticked, in what version) is recoverable too.
+
+## 6. Seeing older versions
+
+Every bump is a commit, so history is plain git on `~/.claude/plan-server`:
+
+```
+git -C ~/.claude/plan-server log --oneline -- plans/<workspace>/<slug>.md
+git -C ~/.claude/plan-server show <sha>:plans/<workspace>/<slug>.md
+git -C ~/.claude/plan-server diff <sha1> <sha2> -- plans/<workspace>/<slug>.md
+```
+
+If the user asks to see or compare an older version, use these rather than trying to reconstruct it from the feedback JSON (resolved items get compacted and don't hold the old plan body).
