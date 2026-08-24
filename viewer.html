@@ -46,6 +46,29 @@ header a:hover { color:var(--accent); }
   color:var(--muted); text-transform:uppercase;
 }
 .pill.version { color:var(--accent); border-color:var(--accent); }
+select.pill.version {
+  appearance:none; -webkit-appearance:none; background:var(--paper);
+  cursor:pointer; font:11px ui-monospace, Menlo, monospace;
+}
+select.pill.version:hover { border-color:var(--accent); }
+button.pill {
+  background:none; cursor:pointer; font-family:ui-monospace, Menlo, monospace;
+}
+button.pill:hover { border-color:var(--accent); color:var(--accent); }
+#histbar {
+  display:none; align-items:center; gap:10px; padding:9px 24px;
+  background:var(--accent-soft); border-bottom:1px solid var(--accent);
+  font:13px/1.4 -apple-system, "Helvetica Neue", sans-serif; color:var(--ink);
+}
+#histbar.on { display:flex; }
+#histbar button {
+  font:12px ui-monospace, Menlo, monospace; text-transform:uppercase;
+  letter-spacing:.05em; padding:3px 10px; border-radius:999px;
+  border:1px solid var(--accent); background:transparent; color:var(--accent);
+  cursor:pointer;
+}
+#histbar button:hover { background:var(--accent); color:var(--paper); }
+#rail.disabled { display:none; }
 #live { margin-left:auto; display:flex; align-items:center; gap:6px;
         font:11px ui-monospace, Menlo, monospace; color:var(--muted);
         text-transform:uppercase; letter-spacing:.06em; }
@@ -238,10 +261,17 @@ button.ghost:hover { color:var(--accent); border-color:var(--accent); }
 <header>
   <a href="/">Redline</a><span style="color:var(--muted)">/</span>
   <span id="title">&hellip;</span>
-  <span class="pill version" id="version"></span>
+  <select class="pill version" id="version"><option value="__live__" selected>v&hellip; (live)</option></select>
   <span class="pill" id="pstatus"></span>
+  <button class="pill" id="download" title="Download this version as a .md file">&#8595; .md</button>
   <span id="live"><span class="dot"></span><span id="livetext">connecting</span></span>
 </header>
+
+<div id="histbar">
+  <span id="histtext"></span>
+  <button id="histrestore">Restore this version</button>
+  <button id="histback">Back to live</button>
+</div>
 
 <main>
   <article id="doc"></article>
@@ -289,7 +319,7 @@ const itemsEl = document.getElementById('items');
 const seltool = document.getElementById('seltool');
 const popover = document.getElementById('popover');
 const state = { plan:null, fbRaw:'', fb:{items:[]}, formOpen:false, formType:null,
-                sel:null, images:[], replyImgs:{} };
+                sel:null, images:[], replyImgs:{}, history:[], historySha:null };
 
 const esc = s => (s||'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
@@ -318,9 +348,21 @@ function setLive(on) {
 function renderPlan(plan) {
   document.getElementById('title').textContent = plan.meta.title || slug;
   document.title = (plan.meta.title || slug) + ' · Redline';
-  document.getElementById('version').textContent = 'v' + (plan.meta.version || '1');
+  const vsel = document.getElementById('version');
+  let live = vsel.querySelector('option[value="__live__"]');
+  if (!live) {
+    live = document.createElement('option');
+    live.value = '__live__';
+    vsel.prepend(live);
+  }
+  live.textContent = 'v' + (plan.meta.version || '1') + ' (live)';
+  vsel.value = '__live__';
   document.getElementById('pstatus').textContent = plan.meta.status || 'draft';
-  docEl.innerHTML = marked.parse(plan.markdown);
+  renderMarkdownBody(plan.markdown);
+}
+
+function renderMarkdownBody(markdown) {
+  docEl.innerHTML = marked.parse(markdown);
   docEl.querySelectorAll('pre > code.language-mermaid').forEach(code => {
     const wrap = document.createElement('div');
     wrap.className = 'mermaid-wrap';
@@ -335,6 +377,76 @@ function renderPlan(plan) {
     try { mermaid.run({nodes}).catch(() => {}); } catch (e) {}
   }
 }
+
+/* ---------- version history ---------- */
+
+async function loadHistory() {
+  let data;
+  try { data = await api('/api/history/' + slug); } catch (e) { return; }
+  state.history = data.commits || [];
+  const vsel = document.getElementById('version');
+  const keep = vsel.value;
+  vsel.querySelectorAll('option:not([value="__live__"])').forEach(o => o.remove());
+  for (const c of state.history) {
+    const opt = document.createElement('option');
+    opt.value = c.sha;
+    const label = c.version ? ('v' + c.version) : c.short;
+    opt.textContent = label + ' · ' + c.date;
+    vsel.appendChild(opt);
+  }
+  vsel.value = keep && [...vsel.options].some(o => o.value === keep) ? keep : '__live__';
+}
+
+async function enterHistory(sha) {
+  let data;
+  try { data = await api('/api/history-at/' + sha + '/' + slug); }
+  catch (e) { toast('Could not load that version'); document.getElementById('version').value = '__live__'; return; }
+  state.historySha = sha;
+  clearHighlights();
+  document.getElementById('rail').classList.add('disabled');
+  const c = state.history.find(h => h.sha === sha);
+  const bar = document.getElementById('histbar');
+  bar.classList.add('on');
+  document.getElementById('histtext').textContent =
+    'Read only · ' + (data.meta.title || slug) + ' ' +
+    (c && c.version ? 'v' + c.version : (c ? c.short : sha.slice(0, 7))) +
+    (c ? ' · ' + c.date : '') + (c ? ' · ' + c.subject : '');
+  document.getElementById('pstatus').textContent = data.meta.status || '';
+  renderMarkdownBody(data.markdown);
+}
+
+function exitHistory() {
+  state.historySha = null;
+  document.getElementById('histbar').classList.remove('on');
+  document.getElementById('rail').classList.remove('disabled');
+  document.getElementById('version').value = '__live__';
+  state.plan = null; // force a full re-render on next refresh
+  refresh();
+}
+
+document.getElementById('version').addEventListener('change', e => {
+  const v = e.target.value;
+  if (v === '__live__') exitHistory();
+  else enterHistory(v);
+});
+document.getElementById('histback').addEventListener('click', exitHistory);
+
+document.getElementById('download').addEventListener('click', () => {
+  window.location.href = state.historySha
+    ? '/raw-at/' + state.historySha + '/' + slug
+    : '/raw/' + slug;
+});
+
+document.getElementById('histrestore').addEventListener('click', async () => {
+  if (!state.historySha) return;
+  if (!confirm('Restore this version as the new latest? This adds it as a new version; nothing is lost.')) return;
+  try {
+    const r = await api('/api/restore/' + state.historySha + '/' + slug, {});
+    toast('Restored as v' + r.version);
+    exitHistory();
+    loadHistory();
+  } catch (e) { toast('Restore failed'); }
+});
 
 function clearHighlights() {
   docEl.querySelectorAll('mark.fb').forEach(m => {
@@ -506,6 +618,7 @@ itemsEl.addEventListener('drop', e => {
 /* ---------- polling ---------- */
 
 async function refresh() {
+  if (state.historySha) return;
   let plan, fb;
   try {
     [plan, fb] = await Promise.all([api('/api/plan/' + slug), api('/api/feedback/' + slug)]);
@@ -521,8 +634,10 @@ async function refresh() {
     const oldV = state.plan && state.plan.meta.version;
     renderPlan(plan);
     window.scrollTo(0, y);
-    if (oldV && oldV !== plan.meta.version)
+    if (oldV && oldV !== plan.meta.version) {
       toast('Claude updated the plan to v' + plan.meta.version);
+      loadHistory();
+    }
     state.plan = plan;
   }
   if (fbChanged) { state.fb = fb; state.fbRaw = fbRaw; renderFeedback(); }
@@ -693,7 +808,7 @@ mermaid.initialize({
   securityLevel: 'loose',
   theme: matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'neutral'
 });
-refresh();
+refresh().then(loadHistory);
 setInterval(refresh, 2500);
 </script>
 </body>

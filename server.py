@@ -13,6 +13,7 @@ import html
 import json
 import os
 import re
+import subprocess
 import sys
 import threading
 import time
@@ -78,6 +79,48 @@ def feedback_file(slug):
 
 def inbox_file(slug):
     return os.path.join(INBOX_DIR, slug.replace("/", "__") + ".json")
+
+
+SHA_RE = re.compile(r"^[0-9a-f]{4,40}$")
+VERSION_IN_SUBJECT = re.compile(r":\s*v(\d+)")
+
+
+def git(*args):
+    """Run git against ROOT. Returns stdout, or None on any failure (not a
+    repo, git missing, file untracked) so history is just absent, not fatal."""
+    try:
+        out = subprocess.run(["git", "-C", ROOT] + list(args),
+                              capture_output=True, text=True, timeout=5)
+    except Exception:
+        return None
+    return out.stdout if out.returncode == 0 else None
+
+
+def plan_git_path(slug):
+    return "plans/" + slug + ".md"
+
+
+def plan_history(slug):
+    out = git("log", "--follow", "--format=%H%x1f%h%x1f%ad%x1f%s",
+               "--date=format:%Y-%m-%d %H:%M", "--", plan_git_path(slug))
+    if not out:
+        return []
+    commits = []
+    for line in out.strip("\n").split("\n"):
+        parts = line.split("\x1f")
+        if len(parts) != 4:
+            continue
+        full, short, date, subject = parts
+        m = VERSION_IN_SUBJECT.search(subject)
+        commits.append({"sha": full, "short": short, "date": date,
+                        "subject": subject, "version": m.group(1) if m else None})
+    return commits
+
+
+def plan_at_commit(slug, sha):
+    if not SHA_RE.match(sha):
+        return None
+    return git("show", "%s:%s" % (sha, plan_git_path(slug)))
 
 
 COMPACT_DROP = ("prefix", "suffix", "comment", "suggested_text", "thread", "reply",
@@ -258,6 +301,15 @@ class Handler(BaseHTTPRequestHandler):
     def send_json(self, obj, code=200):
         self.send_bytes(json.dumps(obj).encode(), "application/json", code)
 
+    def send_download(self, data, filename):
+        self.send_response(200)
+        self.send_header("Content-Type", "text/markdown; charset=utf-8")
+        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Content-Disposition", 'attachment; filename="%s"' % filename)
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(data)
+
     def send_file(self, path, ctype):
         try:
             with open(path, "rb") as f:
@@ -333,6 +385,39 @@ class Handler(BaseHTTPRequestHandler):
         if path.startswith("/api/feedback/"):
             slug = safe_slug(path[len("/api/feedback/"):])
             return self.send_json(load_feedback(slug))
+        if path.startswith("/api/history/"):
+            slug = safe_slug(path[len("/api/history/"):])
+            return self.send_json({"slug": slug, "commits": plan_history(slug)})
+        if path.startswith("/api/history-at/"):
+            rest = path[len("/api/history-at/"):]
+            sha, _, slug_raw = rest.partition("/")
+            slug = safe_slug(slug_raw)
+            content = plan_at_commit(slug, sha) if slug else None
+            if content is None:
+                return self.send_json({"error": "not found"}, 404)
+            meta, body = parse_front_matter(content)
+            return self.send_json({"slug": slug, "sha": sha, "meta": meta, "markdown": body})
+        if path.startswith("/raw/"):
+            slug = safe_slug(path[len("/raw/"):])
+            p = plan_file(slug)
+            if not os.path.exists(p):
+                return self.send_json({"error": "not found"}, 404)
+            with open(p, "rb") as f:
+                data = f.read()
+            with open(p) as f:
+                meta, _ = parse_front_matter(f.read())
+            fname = "%s.v%s.md" % (slug.replace("/", "-"), meta.get("version", "1"))
+            return self.send_download(data, fname)
+        if path.startswith("/raw-at/"):
+            rest = path[len("/raw-at/"):]
+            sha, _, slug_raw = rest.partition("/")
+            slug = safe_slug(slug_raw)
+            content = plan_at_commit(slug, sha) if slug else None
+            if content is None:
+                return self.send_json({"error": "not found"}, 404)
+            meta, _ = parse_front_matter(content)
+            fname = "%s.v%s-%s.md" % (slug.replace("/", "-"), meta.get("version", "x"), sha[:7])
+            return self.send_download(content.encode(), fname)
         self.send_json({"error": "not found"}, 404)
 
     def route_post(self):
@@ -410,6 +495,43 @@ class Handler(BaseHTTPRequestHandler):
                         json.dump({"slug": slug, "count": 1, "at": time.time(),
                                    "mode": mode}, f)
             return self.send_json({"ok": hit})
+
+        if len(parts) >= 4 and parts[:2] == ["api", "restore"]:
+            sha = parts[2]
+            slug = safe_slug("/".join(parts[3:]))
+            if not SHA_RE.match(sha) or not slug:
+                return self.send_json({"error": "bad request"}, 400)
+            content = plan_at_commit(slug, sha)
+            if content is None:
+                return self.send_json({"error": "version not found"}, 404)
+            p = plan_file(slug)
+            if not os.path.exists(p):
+                return self.send_json({"error": "plan not found"}, 404)
+            with LOCK:
+                with open(p) as f:
+                    cur_meta, _ = parse_front_matter(f.read())
+                old_meta, old_body = parse_front_matter(content)
+                try:
+                    new_version = str(int(cur_meta.get("version", "1")) + 1)
+                except ValueError:
+                    new_version = cur_meta.get("version", "1")
+                new_meta = dict(old_meta)
+                new_meta["version"] = new_version
+                new_meta["updated"] = time.strftime("%Y-%m-%d")
+                order = ["title", "version", "status", "updated"]
+                lines = ["---"]
+                for k in order:
+                    if k in new_meta:
+                        lines.append("%s: %s" % (k, new_meta.pop(k)))
+                for k, v in new_meta.items():
+                    lines.append("%s: %s" % (k, v))
+                lines.append("---")
+                new_text = "\n".join(lines) + "\n" + old_body
+                with open(p, "w") as f:
+                    f.write(new_text)
+                git("add", plan_git_path(slug))
+                git("commit", "-m", "%s: v%s - restored from %s" % (slug, new_version, sha[:7]))
+            return self.send_json({"ok": True, "version": new_version})
 
         if len(parts) >= 3 and parts[:2] == ["api", "submit"]:
             slug = safe_slug("/".join(parts[2:]))
