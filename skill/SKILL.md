@@ -112,7 +112,9 @@ When the user approves, implement phase by phase and keep the plan current: tick
 
 ## 6. Seeing older versions
 
-Every bump is a commit, so history is plain git on `~/.claude/plan-server`:
+The page itself has a version dropdown in the header (next to the title): switching it loads any past commit read-only, with a "Restore this version" button (commits the old content back as a new version, nothing destructive) and a "↓ .md" download button (works on the live version or whichever historical one is selected) for handing someone a plain file without needing git. Point the user at that dropdown instead of asking them to run git.
+
+For your own lookups, every bump is a commit, so history is plain git on `~/.claude/plan-server`:
 
 ```
 git -C ~/.claude/plan-server log --oneline -- plans/<workspace>/<slug>.md
