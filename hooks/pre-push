@@ -1,0 +1,15 @@
+#!/bin/sh
+# Refuse to push any commit whose tree contains local-only review data.
+# Enable with: git config core.hooksPath hooks
+zero=0000000000000000000000000000000000000000
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [ "$local_sha" = "$zero" ] && continue
+  if [ "$remote_sha" = "$zero" ]; then range="$local_sha"; else range="$remote_sha..$local_sha"; fi
+  for c in $(git rev-list "$range" 2>/dev/null); do
+    if git ls-tree -r --name-only "$c" | grep -q -E '^(plans|feedback|inbox|uploads)/'; then
+      echo "pre-push: commit $c contains local-only review data (plans/ feedback/ inbox/ uploads/). Push refused." >&2
+      exit 1
+    fi
+  done
+done
+exit 0

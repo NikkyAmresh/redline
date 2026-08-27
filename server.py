@@ -13,6 +13,7 @@ import html
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import threading
@@ -38,6 +39,37 @@ MAX_BODY = 32 * 1024 * 1024  # fits a 15 MB image as a base64 JSON field
 
 for d in (PLANS_DIR, FEEDBACK_DIR, INBOX_DIR, VENDOR_DIR, UPLOADS_DIR):
     os.makedirs(d, exist_ok=True)
+
+
+def _seed_example_plan():
+    """First run only: copy the bundled example into plans/ so the live demo
+    works. plans/ itself is local-only and gitignored by the Redline repo."""
+    example = os.path.join(ROOT, "examples", "plan-server", "v1.md")
+    if not os.path.exists(example):
+        return
+    for _, _, files in os.walk(PLANS_DIR):
+        if any(f.endswith(".md") for f in files):
+            return
+    dest = os.path.join(PLANS_DIR, "plan-server", "v1.md")
+    os.makedirs(os.path.dirname(dest), exist_ok=True)
+    shutil.copyfile(example, dest)
+
+
+def _init_plans_repo():
+    """plans/ keeps its own git history (one commit per plan version) in a
+    nested repo, separate from the Redline repo, so plans can never ride
+    along with a push of the tool itself."""
+    if os.path.isdir(os.path.join(PLANS_DIR, ".git")):
+        return
+    try:
+        subprocess.run(["git", "-C", PLANS_DIR, "init", "-q"],
+                       capture_output=True, timeout=5)
+    except Exception:
+        pass
+
+
+_seed_example_plan()
+_init_plans_repo()
 
 IMAGE_TYPES = {"image/png": "png", "image/jpeg": "jpg",
                "image/webp": "webp", "image/gif": "gif"}
@@ -86,10 +118,11 @@ VERSION_IN_SUBJECT = re.compile(r":\s*v(\d+)")
 
 
 def git(*args):
-    """Run git against ROOT. Returns stdout, or None on any failure (not a
-    repo, git missing, file untracked) so history is just absent, not fatal."""
+    """Run git against the nested plans/ repo (never the Redline repo).
+    Returns stdout, or None on any failure (not a repo, git missing, file
+    untracked) so history is just absent, not fatal."""
     try:
-        out = subprocess.run(["git", "-C", ROOT] + list(args),
+        out = subprocess.run(["git", "-C", PLANS_DIR] + list(args),
                               capture_output=True, text=True, timeout=5)
     except Exception:
         return None
@@ -97,7 +130,7 @@ def git(*args):
 
 
 def plan_git_path(slug):
-    return "plans/" + slug + ".md"
+    return slug + ".md"  # relative to PLANS_DIR, the nested repo root
 
 
 def plan_history(slug):

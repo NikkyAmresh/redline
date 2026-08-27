@@ -24,9 +24,11 @@ ln -s ../plan-server/skill ~/.claude/skills/plan-review
 python3 ~/.claude/plan-server/server.py     # http://localhost:4747
 ```
 
-Then in any Claude Code session, ask for a plan (or say `/plan-review`). Claude writes the plan as markdown, opens it in your browser, and arms a watcher for your feedback. The tracked example plan at `http://localhost:4747/plan/plan-server/v1` is itself a live demo: select a sentence and try it.
+Then in any Claude Code session, ask for a plan (or say `/plan-review`). Claude writes the plan as markdown, opens it in your browser, and arms a watcher for your feedback. The example plan (seeded into `plans/` from `examples/` on first start) at `http://localhost:4747/plan/plan-server/v1` is itself a live demo: select a sentence and try it.
 
 Requirements: Python 3.7+, Claude Code. macOS and Linux are supported; the skill's shell snippets are POSIX.
+
+Your data stays on your machine: `plans/`, `feedback/`, `inbox/` and `uploads/` are gitignored here, and `plans/` keeps its own nested git repo for per-version history. Run `git config core.hooksPath hooks` after cloning to install a pre-push guard that refuses to push any commit containing those directories.
 
 ## How it works
 

@@ -27,11 +27,11 @@ Content guidelines:
 - Phase sections with `- [ ]` task checklists, a components table, and a risks or open questions section.
 - Follow any writing style preferences the user has expressed.
 
-`plans/` is a git repo (root at `~/.claude/plan-server`). After writing the file, commit it so v1 is a retrievable point in history, not just a number in the front matter:
+`plans/` is its own local-only git repo (root at `~/.claude/plan-server/plans`, created by the server on first start). It is separate from the Redline repo and gitignored there; plans, feedback, inbox and uploads must never be added to or pushed from `~/.claude/plan-server`. After writing the file, commit it in the plans repo so v1 is a retrievable point in history, not just a number in the front matter:
 
 ```
-git -C ~/.claude/plan-server add plans/<workspace>/<slug>.md
-git -C ~/.claude/plan-server commit -m "<workspace>/<slug>: v1"
+git -C ~/.claude/plan-server/plans add <workspace>/<slug>.md
+git -C ~/.claude/plan-server/plans commit -m "<workspace>/<slug>: v1"
 ```
 
 ## 2. Serve and open

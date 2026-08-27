@@ -1,4 +1,6 @@
-# Review data stays local
+# Review data stays local. plans/ is its own local-only git repo (version
+# history for plans); it must never be committed to this repository.
+plans/
 feedback/
 inbox/
 
@@ -8,7 +10,7 @@ __pycache__/
 # Screenshots attached to feedback stay local
 uploads/
 
-# wrangler local state
+# wrangler local state (contains the cached account file)
 .wrangler/
 node_modules
 .venv
