@@ -654,18 +654,18 @@ function commands() {
   const out = [];
   const add = (group, title, run, extra) => out.push(Object.assign({group, title, run}, extra || {}));
   if (state.sel && !seltool.hidden) {
-    add('Actions', 'Comment on the selection', () => openForm('comment'), {key: 'C'});
-    add('Actions', 'Suggest an edit to the selection', () => openForm('edit'), {key: 'E'});
+    add('Actions', 'Comment on the selection', () => openForm('comment'), {key: 'C', icon: 'comment'});
+    add('Actions', 'Suggest an edit to the selection', () => openForm('edit'), {key: 'E', icon: 'edit'});
   }
-  if (!state.historySha) add('Actions', 'General note', generalNote, {key: 'N'});
+  if (!state.historySha) add('Actions', 'General note', generalNote, {key: 'N', icon: 'comment'});
   const c = rail.counts();
   if (c.draft && !state.historySha) add('Actions', 'Send ' + c.draft + ' to Claude', () => rail.send(), {key: MAC ? '⌘ ↵' : 'Ctrl ↵'});
   const prev = previousCommit();
-  if (prev && !state.historySha) add('Actions', (state.changes ? 'Hide' : 'Show') + ' changes since ' + vLabel(prev), () => toggleChanges());
-  if (state.historySha) add('Actions', 'Back to the live version', exitHistory);
-  if (state.plan && state.plan.meta.prototype) add('Actions', 'Open the prototype', () => { location.href = '/proto/' + state.plan.meta.prototype; });
-  add('Actions', 'Download this version', () => { location.href = $('dl').href; });
-  add('Actions', 'Switch to the ' + (theme() === 'dark' ? 'light' : 'dark') + ' theme', Studio.toggleTheme);
+  if (prev && !state.historySha) add('Actions', (state.changes ? 'Hide' : 'Show') + ' changes since ' + vLabel(prev), () => toggleChanges(), {icon: 'history'});
+  if (state.historySha) add('Actions', 'Back to the live version', exitHistory, {icon: 'history'});
+  if (state.plan && state.plan.meta.prototype) add('Actions', 'Open the prototype', () => { location.href = '/proto/' + state.plan.meta.prototype; }, {icon: 'phone'});
+  add('Actions', 'Download this version', () => { location.href = $('dl').href; }, {icon: 'down'});
+  add('Actions', 'Switch to the ' + (theme() === 'dark' ? 'light' : 'dark') + ' theme', Studio.toggleTheme, {icon: theme() === 'dark' ? 'sun' : 'moon'});
   if (!Studio.isPhone()) {
     add('Actions', (Studio.paneOpen('left') ? 'Hide' : 'Show') + ' the outline and versions', () => Studio.togglePane('left'), {key: '[', icon: 'side-l'});
     add('Actions', (Studio.paneOpen('right') ? 'Hide' : 'Show') + ' the review panel', () => Studio.togglePane('right'), {key: ']', icon: 'side-r'});
