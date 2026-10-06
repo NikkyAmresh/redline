@@ -20,7 +20,7 @@ Redline moves both into the browser and sends your feedback straight back to the
 - **Comments point at one exact place.** Each comment records the source lines and character offsets it was made on, plus a readable path like `Phase 2 › item 2`, while the markdown stays untouched. Repeated phrases never get mixed up, selections across bold, code and links highlight cleanly, and long selections reach Claude as a short `head … tail` quote plus the line numbers.
 - **An async loop.** Batch your notes and press "Send to Claude". The session picks them up through an inbox watcher without dropping what it was doing, edits the plan and bumps the version; the page updates live. "Run independently" hands the batch to a background agent so the main session's context stays clean.
 - **Plans that live on.** Every version is kept: the version menu and the History tab load any past version, highlight what changed since the previous one, restore it or download it as `.md`. Plans survive `/clear`, compaction and restarts, and double as a progress board while Claude implements.
-- **A workspace, not a page.** An outline with comment counts per section, source line numbers, an overview ruler of every comment, and a command bar (`⌘K`) to jump to any section, comment, screen or version. Dark and light themes, and a phone layout.
+- **A workspace, not a page.** An outline with comment counts per section, source line numbers, an overview ruler of every comment, and a command bar (`⌘K`) to jump to any section, comment, screen or version. Both side panels collapse (`[` and `]`) for a full width document. Dark and light themes, and a phone layout.
 
 ## Prototypes
 

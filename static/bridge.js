@@ -576,7 +576,7 @@ function onKey(e) {
   if (mod && !e.altKey && (e.key === 'k' || e.key === 'K')) { e.preventDefault(); send('key', {key: 'palette'}); return; }
   if (typing || mod || e.altKey) return;
   const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
-  if (k === 'c' || k === 'n' || k === 'Escape') send('key', {key: k});
+  if (k === 'c' || k === 'n' || k === '[' || k === ']' || k === 'Escape') send('key', {key: k});
 }
 
 /* ---------- wiring ---------- */

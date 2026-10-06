@@ -25,6 +25,9 @@
     <a class="hbtn" id="planLink" hidden title="Open the plan behind this prototype"><svg class="i"><use href="#i-plan"/></svg><span class="lbl">Plan</span></a>
     <a class="hbtn" id="dl" title="Download this version"><svg class="i"><use href="#i-down"/></svg><span class="ext">.html</span></a>
     <button class="hbtn" data-theme-toggle></button>
+    <span class="vsep"></span>
+    <button class="hbtn ptog" data-pane-toggle="left"><svg class="i"><use href="#i-side-l"/></svg></button>
+    <button class="hbtn ptog" data-pane-toggle="right"><svg class="i"><use href="#i-side-r"/></svg></button>
     <span class="live" id="live"><i></i><span id="livetext">Connecting</span></span>
   </div>
 </header>
@@ -177,10 +180,17 @@ const rail = Redline.mount({
     $('rdot').hidden = !c.answered;
     $('tbBadge').hidden = !c.answered;
     $('tbBadge').textContent = c.answered;
+    replyDot();
     renderScreens();
   },
   refresh: () => refresh(),
 });
+
+// a closed review panel still shows that Claude is waiting on a reply
+function replyDot() {
+  document.querySelector('[data-pane-toggle="right"]').classList.toggle('has-dot', !!rail.counts().answered && !Studio.paneOpen('right'));
+}
+Studio.onPane(replyDot);
 
 function openScreenNote() {
   if (state.historySha) { toast('Go back to the live version to comment'); return; }
@@ -330,6 +340,8 @@ function onKey(key) {
     setMode(state.mode === 'comment' ? 'interact' : 'comment');
   } else if (key === 'n' && !rail.isFormOpen()) {
     openScreenNote();
+  } else if ((key === '[' || key === ']') && !Studio.isPhone()) {
+    Studio.togglePane(key === '[' ? 'left' : 'right');
   }
 }
 
@@ -385,6 +397,7 @@ window.addEventListener('message', e => {
     if (done) { state.shots.delete(m.pid); done(m.data); }
   } else if (m.type === 'pinclick') {
     showPane('pane-comments');
+    Studio.revealPane('right');
     showTab('comments');
     rail.focusCard(m.id);
   } else if (m.type === 'detached') {
@@ -597,10 +610,14 @@ function commands() {
   if (state.proto && state.proto.meta.plan) add('Actions', 'Open the plan', () => { location.href = $('planLink').href; }, {icon: 'plan'});
   add('Actions', 'Download this version', () => { location.href = $('dl').href; }, {icon: 'down'});
   add('Actions', 'Switch to the ' + (theme() === 'dark' ? 'light' : 'dark') + ' theme', Studio.toggleTheme, {icon: theme() === 'dark' ? 'sun' : 'moon'});
+  if (!Studio.isPhone()) {
+    add('Actions', (Studio.paneOpen('left') ? 'Hide' : 'Show') + ' the screens and versions', () => Studio.togglePane('left'), {key: '[', icon: 'side-l'});
+    add('Actions', (Studio.paneOpen('right') ? 'Hide' : 'Show') + ' the review panel', () => Studio.togglePane('right'), {key: ']', icon: 'side-r'});
+  }
   state.screens.forEach(s => add('Screens', s.title, () => gotoScreen(s.id), {icon: 'screen'}));
   if (!state.historySha) rail.items().forEach(i => add('Comments',
     (i.kind === 'pin' ? '#' + pinNumber(i.id) + ' ' : '') + (i.quote || (i.kind === 'screen' ? 'Note on ' + (i.section || 'a screen') : 'General note')) + (i.comment ? ': ' + i.comment : ''),
-    () => { showPane('pane-comments'); showTab('comments'); rail.focusCard(i.id); if (i.anchor && i.anchor.screen) post({type: 'goto', route: i.anchor.route, screen: i.anchor.screen, focus: i.kind === 'pin' ? i.id : null}); },
+    () => { showPane('pane-comments'); Studio.revealPane('right'); showTab('comments'); rail.focusCard(i.id); if (i.anchor && i.anchor.screen) post({type: 'goto', route: i.anchor.route, screen: i.anchor.screen, focus: i.kind === 'pin' ? i.id : null}); },
     {dot: i.status === 'answered' ? 'var(--red)' : i.status === 'resolved' ? 'var(--green)' : i.status === 'submitted' ? 'var(--blue)' : 'var(--amber)'}));
   state.history.forEach((v, i) => add('Versions', vLabel(v) + ', ' + subjectTitle(v),
     () => Studio.isLive(v, i, liveVersion()) ? exitHistory() : enterHistory(v.sha), {icon: 'history'}));

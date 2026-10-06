@@ -129,7 +129,19 @@ button.pill:hover, a.pill:hover { background:var(--raise-2); color:var(--ink); }
 .send:disabled kbd { color:var(--ink-4); background:var(--kbd); border-color:var(--line-2); }
 
 /* ---------- three-pane layout ---------- */
-.app { display:grid; grid-template-columns:252px minmax(0,1fr) 384px; height:calc(100vh - var(--top-h)); height:calc(100dvh - var(--top-h)); min-height:0; }
+.app { --lw:252px; --rw:384px; display:grid; grid-template-columns:var(--lw) minmax(0,1fr) var(--rw); height:calc(100vh - var(--top-h)); height:calc(100dvh - var(--top-h)); min-height:0; }
+.app > .pane-left { grid-column:1; } .app > .pane-doc, .app > .pane-stage { grid-column:2; } .app > .pane-right { grid-column:3; }
+/* collapsible side panes; the phone layout keeps its own tabs */
+@media (min-width:861px) {
+  :root[data-left="closed"] .app { --lw:0px; }
+  :root[data-left="closed"] .pane-left { display:none; }
+  :root[data-right="closed"] .app { --rw:0px; }
+  :root[data-right="closed"] .pane-right { display:none; }
+}
+.ptog { position:relative; }
+.ptog[aria-pressed="false"] { color:var(--ink-3); }
+.ptog.has-dot::after { content:""; position:absolute; top:5px; right:5px; width:7px; height:7px; border-radius:50%; background:var(--red); box-shadow:0 0 0 2px var(--app); }
+.tools .vsep { margin:0 2px; }
 .pane { min-height:0; }
 .pane-left { border-right:1px solid var(--line); overflow:auto; padding:12px 10px 16px; display:flex; flex-direction:column; gap:4px; }
 .pl-h { display:flex; align-items:center; justify-content:space-between; color:var(--ink-3); font-size:12px; font-weight:500; padding:6px 8px; }
@@ -511,8 +523,10 @@ mark.fb.flash { background:rgba(124,140,255,.38); }
 .tabbar { display:none; }
 .m-only { display:none; }
 @media (max-width:1180px) {
-  .app { grid-template-columns:minmax(0,1fr) 360px; }
+  .app { --lw:0px; --rw:360px; }
   .pane-left { display:none; }
+  :root[data-left="open"] .app { --lw:232px; }
+  :root[data-left="open"] .pane-left { display:flex; }
   .cmdk { width:200px; }
   .cmdk .lbl { display:none; }
   .cmdk .kbds { margin-left:auto; }
@@ -522,7 +536,7 @@ mark.fb.flash { background:rgba(124,140,255,.38); }
   .top { position:sticky; top:0; height:auto; display:grid; grid-template-columns:auto 1fr auto; grid-template-areas:"brand . tools" "ctx ctx ctx";
          gap:6px 8px; padding:8px 14px 9px; }
   .brand { grid-area:brand; } .ctx { grid-area:ctx; } .ctx .vsep { display:none; } .tools { grid-area:tools; }
-  .cmdk { display:none; } .m-only { display:inline-flex; }
+  .cmdk { display:none; } .m-only { display:inline-flex; } .ptog, .tools .vsep { display:none; }
   .hbtn .lbl { display:none; } .hbtn { padding:0 6px; }
   .app { display:block; height:auto; }
   .pane { display:none; }

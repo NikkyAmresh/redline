@@ -27,6 +27,9 @@
     <a class="hbtn" id="protoLink" hidden title="Open the prototype for this plan"><svg class="i"><use href="#i-phone"/></svg><span class="lbl">Prototype</span></a>
     <a class="hbtn" id="dl" title="Download this version"><svg class="i"><use href="#i-down"/></svg><span class="ext">.md</span></a>
     <button class="hbtn" data-theme-toggle></button>
+    <span class="vsep"></span>
+    <button class="hbtn ptog" data-pane-toggle="left"><svg class="i"><use href="#i-side-l"/></svg></button>
+    <button class="hbtn ptog" data-pane-toggle="right"><svg class="i"><use href="#i-side-r"/></svg></button>
     <span class="live" id="live"><i></i><span id="livetext">Connecting</span></span>
   </div>
 </header>
@@ -137,9 +140,16 @@ const rail = Redline.mount({
     $('rdot').hidden = !c.answered;
     $('tbBadge').hidden = !c.answered;
     $('tbBadge').textContent = c.answered;
+    replyDot();
   },
   refresh: () => refresh(),
 });
+
+// a closed review panel still shows that Claude is waiting on a reply
+function replyDot() {
+  document.querySelector('[data-pane-toggle="right"]').classList.toggle('has-dot', !!rail.counts().answered && !Studio.paneOpen('right'));
+}
+Studio.onPane(replyDot);
 
 /* ---------- rendering the plan ---------- */
 
@@ -656,6 +666,10 @@ function commands() {
   if (state.plan && state.plan.meta.prototype) add('Actions', 'Open the prototype', () => { location.href = '/proto/' + state.plan.meta.prototype; });
   add('Actions', 'Download this version', () => { location.href = $('dl').href; });
   add('Actions', 'Switch to the ' + (theme() === 'dark' ? 'light' : 'dark') + ' theme', Studio.toggleTheme);
+  if (!Studio.isPhone()) {
+    add('Actions', (Studio.paneOpen('left') ? 'Hide' : 'Show') + ' the outline and versions', () => Studio.togglePane('left'), {key: '[', icon: 'side-l'});
+    add('Actions', (Studio.paneOpen('right') ? 'Hide' : 'Show') + ' the review panel', () => Studio.togglePane('right'), {key: ']', icon: 'side-r'});
+  }
   docEl.querySelectorAll('h1, h2, h3').forEach(h => add('Sections', h.textContent.trim(), () => { showPane('pane-plan'); jumpTo(h); }, {icon: 'hash'}));
   if (!state.historySha) rail.items().forEach(i => add('Comments', (i.quote || 'General note') + (i.comment ? ': ' + i.comment : ''), () => revealItem(i.id),
     {dot: i.status === 'answered' ? 'var(--red)' : i.status === 'resolved' ? 'var(--green)' : i.status === 'submitted' ? 'var(--blue)' : 'var(--amber)'}));

@@ -16,6 +16,13 @@ try { saved = localStorage.getItem('rl-theme'); } catch (e) {}
 document.documentElement.dataset.theme = saved === 'light' || saved === 'dark' ? saved
   : matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
 
+// side panes: an explicit choice is remembered; otherwise the layout decides
+for (const side of ['left', 'right']) {
+  let v = null;
+  try { v = localStorage.getItem('rl-' + side); } catch (e) {}
+  if (v === 'open' || v === 'closed') document.documentElement.dataset[side] = v;
+}
+
 const themeHooks = [];
 const theme = () => document.documentElement.dataset.theme === 'light' ? 'light' : 'dark';
 
@@ -68,6 +75,8 @@ const SPRITE =
   + P('i-screen', '<rect x="4" y="3.5" width="16" height="17" rx="2.5"/><path d="M8 8h8M8 12h5"/>')
   + P('i-proto', '<rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M10.5 18.5h3"/><path d="M9 7h6M9 10.5h4"/>')
   + P('i-plan', '<path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h6"/>')
+  + P('i-side-l', '<rect x="3" y="4.5" width="18" height="15" rx="2.5"/><path d="M9 4.5v15"/>')
+  + P('i-side-r', '<rect x="3" y="4.5" width="18" height="15" rx="2.5"/><path d="M15 4.5v15"/>')
   + P('i-folder', '<path d="M3.5 6.5a2 2 0 0 1 2-2h4l2 2.5h7a2 2 0 0 1 2 2v8.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/>');
 
 function boot() {
@@ -78,6 +87,7 @@ function boot() {
   }
   document.querySelectorAll('kbd.mod').forEach(k => { k.textContent = MAC ? '⌘' : 'Ctrl'; });
   paintTheme();
+  paintPanes();
   const tabbar = document.getElementById('tabbar');
   if (tabbar) tabbar.addEventListener('click', e => { const b = e.target.closest('button'); if (b) showPane(b.dataset.pane, true); });
 }
@@ -101,6 +111,46 @@ function showPane(id, force) {
   window.scrollTo(0, 0);
   window.dispatchEvent(new Event('resize'));
 }
+
+/* ---------- collapsible side panes ---------- */
+
+const PANE_NAMES = {left: 'side panel', right: 'review panel'};
+const paneHooks = [];
+// open unless closed; the left pane starts closed on narrow screens
+function paneOpen(side) {
+  const v = document.documentElement.dataset[side];
+  if (v) return v === 'open';
+  return side === 'right' || innerWidth > 1180;
+}
+function paintPanes() {
+  document.querySelectorAll('[data-pane-toggle]').forEach(b => {
+    const side = b.dataset.paneToggle, open = paneOpen(side);
+    b.setAttribute('aria-pressed', open);
+    b.title = (open ? 'Hide' : 'Show') + ' the ' + PANE_NAMES[side] + ' (' + (side === 'left' ? '[' : ']') + ')';
+    b.setAttribute('aria-label', b.title);
+  });
+}
+function setPane(side, open) {
+  document.documentElement.dataset[side] = open ? 'open' : 'closed';
+  try { localStorage.setItem('rl-' + side, open ? 'open' : 'closed'); } catch (e) {}
+  paintPanes();
+  paneHooks.forEach(f => f(side, open));
+  window.dispatchEvent(new Event('resize'));
+}
+const togglePane = side => setPane(side, !paneOpen(side));
+// make sure a pane is visible, on the phone by switching tabs
+function revealPane(side) {
+  if (isPhone()) return;
+  if (!paneOpen(side)) setPane(side, true);
+}
+document.addEventListener('click', e => { const b = e.target.closest('[data-pane-toggle]'); if (b) togglePane(b.dataset.paneToggle); });
+document.addEventListener('keydown', e => {
+  if (e.metaKey || e.ctrlKey || e.altKey || isPhone()) return;
+  const t = e.target;
+  if (t && t.closest && t.closest('input, textarea, select, [contenteditable="true"]')) return;
+  if (e.key === '[' || e.key === ']') { e.preventDefault(); togglePane(e.key === '[' ? 'left' : 'right'); }
+});
+window.addEventListener('resize', () => paintPanes());
 
 /* ---------- dates and versions ---------- */
 
@@ -234,7 +284,7 @@ function palette(commands) {
 
 window.Studio = {
   esc, MAC, theme, setTheme, toggleTheme, onTheme: f => themeHooks.push(f),
-  setLive, showPane, isPhone,
+  setLive, showPane, isPhone, paneOpen, setPane, togglePane, revealPane, onPane: f => paneHooks.push(f),
   niceDate, subjectTitle, vLabel, stat, isLive, versionList, historyTimeline, versionMenuItems,
   menu, palette,
 };
