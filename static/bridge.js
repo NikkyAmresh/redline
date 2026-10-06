@@ -267,7 +267,15 @@ function resolve(a) {
     let list = Array.from(scope.querySelectorAll(sel));
     if (!list.length) list = Array.from(document.querySelectorAll(sel));
     if (list.length) {
-      // a list of cards can share one id; the text tells them apart
+      // several cards can share one id. When the recorded path still points
+      // at one of them with the same text, that is the card: this settles
+      // identical cards, which text alone cannot tell apart.
+      if (list.length > 1 && a.selector) {
+        let at = null;
+        try { at = document.querySelector(a.selector); } catch (e) {}
+        if (at && list.includes(at) && (!a.text || similar(textOf(at), a.text))) return at;
+      }
+      // otherwise the text tells them apart
       return list.find(el => a.text && similar(textOf(el), a.text) && isShown(el))
           || list.find(el => a.text && similar(textOf(el), a.text))
           || list.find(isShown) || list[0];

@@ -8,6 +8,7 @@
 <script src="/vendor/marked.min.js"></script>
 <script src="/vendor/mermaid.min.js"></script>
 <script src="/static/rail.js"></script>
+<script src="/static/anchors.js"></script>
 <style>
 html { scroll-behavior:smooth; }
 body {
@@ -55,6 +56,15 @@ mark.fb.resolved { background:var(--hl-resolved);
 mark.fb.answered { background:var(--hl-answered);
                    border-bottom-color:rgba(220,38,38,.7); }
 mark.fb.flash { outline:2px solid var(--accent); }
+/* comment highlights drawn without touching the DOM (CSS Custom Highlight
+   API), so they work across bold, code and links; mark.fb is the fallback */
+::highlight(rl-open) { background-color:var(--hl); text-decoration:underline 2px rgba(217,119,6,.75);
+                       text-underline-offset:3px; }
+::highlight(rl-answered) { background-color:var(--hl-answered); text-decoration:underline 2px rgba(220,38,38,.7);
+                           text-underline-offset:3px; }
+::highlight(rl-resolved) { background-color:var(--hl-resolved); text-decoration:underline 2px rgba(34,197,94,.6);
+                           text-underline-offset:3px; }
+::highlight(rl-flash) { background-color:rgba(245,158,11,.5); }
 
 #seltool {
   position:absolute; z-index:30; display:flex; gap:1px;
@@ -126,14 +136,7 @@ const rail = Redline.mount({
     state.sel = {quote:'', section:'', prefix:'', suffix:'', rect:null};
     openForm('comment');
   }}],
-  onCardClick: item => {
-    const mark = docEl.querySelector('mark.fb[data-id="' + CSS.escape(item.id) + '"]');
-    if (mark) {
-      mark.scrollIntoView({block:'center'});
-      mark.classList.add('flash');
-      setTimeout(() => mark.classList.remove('flash'), 1200);
-    }
-  },
+  onCardClick: item => { RedlineAnchors.reveal(docEl, item.id); },
   refresh: () => refresh(),
 });
 
@@ -155,14 +158,16 @@ function renderPlan(plan) {
   const pl = document.getElementById('protolink');
   pl.hidden = !plan.meta.prototype;
   if (plan.meta.prototype) pl.href = '/proto/' + plan.meta.prototype;
-  renderMarkdownBody(plan.markdown);
+  renderMarkdownBody(plan.markdown, plan.body_line);
 }
 
-function renderMarkdownBody(markdown) {
-  docEl.innerHTML = marked.parse(markdown);
+function renderMarkdownBody(markdown, bodyLine) {
+  // blocks carry the source lines they came from (data-src), for anchors
+  RedlineAnchors.render(docEl, markdown, bodyLine || 1);
   docEl.querySelectorAll('pre > code.language-mermaid').forEach(code => {
     const wrap = document.createElement('div');
     wrap.className = 'mermaid-wrap';
+    if (code.parentElement.dataset.src) wrap.dataset.src = code.parentElement.dataset.src;
     const div = document.createElement('div');
     div.className = 'mermaid';
     div.textContent = code.textContent;
@@ -209,7 +214,7 @@ async function enterHistory(sha) {
     (c && c.version ? 'v' + c.version : (c ? c.short : sha.slice(0, 7))) +
     (c ? ' · ' + c.date : '') + (c ? ' · ' + c.subject : '');
   document.getElementById('pstatus').textContent = data.meta.status || '';
-  renderMarkdownBody(data.markdown);
+  renderMarkdownBody(data.markdown, data.body_line);
 }
 
 function exitHistory() {
@@ -246,38 +251,11 @@ document.getElementById('histrestore').addEventListener('click', async () => {
 });
 
 function clearHighlights() {
-  docEl.querySelectorAll('mark.fb').forEach(m => {
-    const parent = m.parentNode;
-    while (m.firstChild) parent.insertBefore(m.firstChild, m);
-    m.remove();
-    parent.normalize();
-  });
+  RedlineAnchors.clear(docEl);
 }
 
 function applyHighlights() {
-  clearHighlights();
-  for (const item of rail.items()) {
-    const q = (item.quote || '').trim();
-    if (q.length < 3 || q.length > 500) continue;
-    const walker = document.createTreeWalker(docEl, NodeFilter.SHOW_TEXT, {
-      acceptNode: n => n.parentElement.closest('.mermaid-wrap, mark.fb')
-        ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT
-    });
-    let node;
-    while ((node = walker.nextNode())) {
-      const idx = node.data.indexOf(q);
-      if (idx < 0) continue;
-      const range = document.createRange();
-      range.setStart(node, idx);
-      range.setEnd(node, idx + q.length);
-      const mark = document.createElement('mark');
-      mark.className = 'fb' + (item.status === 'resolved' ? ' resolved'
-                             : item.status === 'answered' ? ' answered' : '');
-      mark.dataset.id = item.id;
-      try { range.surroundContents(mark); } catch (e) {}
-      break;
-    }
-  }
+  RedlineAnchors.paint(docEl, rail.items(), state.plan && state.plan.meta.version);
 }
 
 /* ---------- polling ---------- */
@@ -308,15 +286,6 @@ async function refresh() {
 
 /* ---------- selection & forms ---------- */
 
-function nearestHeading(range) {
-  let best = '';
-  for (const h of docEl.querySelectorAll('h1,h2,h3,h4')) {
-    const pos = h.compareDocumentPosition(range.startContainer);
-    if (pos & Node.DOCUMENT_POSITION_FOLLOWING) best = h.textContent;
-  }
-  return best.trim();
-}
-
 document.addEventListener('mouseup', e => {
   if (rail.isFormOpen() || seltool.contains(e.target) ||
       document.getElementById('popover').contains(e.target)) return;
@@ -327,17 +296,14 @@ document.addEventListener('mouseup', e => {
     if (text.length < 3) { seltool.hidden = true; return; }
     const range = sel.getRangeAt(0);
     if (!docEl.contains(range.commonAncestorContainer)) { seltool.hidden = true; return; }
-    const full = docEl.innerText;
-    const at = full.indexOf(text);
+    // where the selection is in the source, not just what it says
+    const cap = RedlineAnchors.capture(docEl, range, text);
+    if (!cap) { seltool.hidden = true; return; }
     const r = range.getBoundingClientRect();
-    state.sel = {
-      quote: text,
-      section: nearestHeading(range),
-      prefix: at > 0 ? full.slice(Math.max(0, at - 40), at) : '',
-      suffix: at >= 0 ? full.slice(at + text.length, at + text.length + 40) : '',
+    state.sel = Object.assign(cap, {
       rect: {left: r.left + scrollX, right: r.right + scrollX,
              top: r.top + scrollY, bottom: r.bottom + scrollY}
-    };
+    });
     seltool.hidden = false;
     seltool.style.left = Math.max(8, Math.min(
       state.sel.rect.left, scrollX + innerWidth - seltool.offsetWidth - 16)) + 'px';
@@ -348,11 +314,20 @@ document.addEventListener('mouseup', e => {
 function openForm(type) {
   seltool.hidden = true;
   const s = state.sel;
+  const extra = {quote: s.quote, section: s.section, prefix: s.prefix, suffix: s.suffix};
+  if (s.anchor) {
+    extra.anchor = s.anchor;
+    // the version and commit the lines refer to
+    extra.at = {version: state.plan && state.plan.meta.version,
+                sha: state.history[0] && state.history[0].sha};
+    if (s.quote_len) extra.quote_len = s.quote_len;
+  }
   rail.openForm(type, {
     label: s.quote ? '“' + s.quote + '”' : 'General note on the whole plan',
-    editText: s.quote,
+    where: s.anchor ? 'line ' + s.anchor.lines + ' · ' + s.anchor.where : '',
+    editText: s.full || s.quote,
     rect: s.rect,
-    extra: {quote: s.quote, section: s.section, prefix: s.prefix, suffix: s.suffix},
+    extra,
     onClose: () => { const sel = window.getSelection(); if (sel) sel.removeAllRanges(); },
   });
 }

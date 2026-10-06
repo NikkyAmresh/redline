@@ -34,7 +34,7 @@ except ImportError:  # Windows: no single-instance lock, everything else works
     fcntl = None
 
 APP = "redline"
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 DEFAULT_PORT = 4747
 PORT_SPAN = 20  # try DEFAULT_PORT..DEFAULT_PORT+20 when a port is taken
 
@@ -295,7 +295,34 @@ def prepare_proto_html(data):
     return text.encode("utf-8")
 
 
-ANCHOR_STRINGS = ("screen", "title", "route", "component", "selector", "tag", "text")
+ANCHOR_STRINGS = ("screen", "title", "route", "component", "selector", "tag", "text", "where")
+LINES_RE = re.compile(r"^\d{1,6}(-\d{1,6})?$")
+QUOTE_MAX = 400
+
+
+def body_line(text, body):
+    """1-based file line where the markdown body starts, so anchors in the
+    browser can name real line numbers of the .md file."""
+    return text[:len(text) - len(body)].count("\n") + 1
+
+
+def clean_at(at):
+    """The plan version and commit a comment's line numbers refer to."""
+    if not isinstance(at, dict):
+        return None
+    out = {}
+    if isinstance(at.get("version"), (str, int)) and not isinstance(at.get("version"), bool):
+        out["version"] = str(at["version"])[:20]
+    if isinstance(at.get("sha"), str) and SHA_RE.match(at["sha"]):
+        out["sha"] = at["sha"]
+    return out or None
+
+
+def cap_quote(q):
+    if not isinstance(q, str) or len(q) <= QUOTE_MAX:
+        return q
+    side = QUOTE_MAX // 2 - 10
+    return q[:side].rstrip() + " … " + q[-side:].lstrip()
 
 
 def _num(v):
@@ -316,6 +343,14 @@ def clean_anchor(a):
         v = a.get(k)
         if isinstance(v, list) and len(v) == n and all(_num(x) for x in v):
             out[k] = [round(max(0.0, min(1.0, float(x))), 4) for x in v]
+    # plan anchors: source lines plus start/end block and character offset
+    if isinstance(a.get("lines"), str) and LINES_RE.match(a["lines"]):
+        out["lines"] = a["lines"]
+    for k in ("s", "e"):
+        v = a.get(k)
+        if isinstance(v, dict) and isinstance(v.get("src"), str) and LINES_RE.match(v["src"]) \
+                and _num(v.get("o")):
+            out[k] = {"src": v["src"], "o": max(0, int(v["o"]))}
     vp = a.get("viewport")
     if isinstance(vp, dict):
         o = {}
@@ -902,8 +937,10 @@ class Handler(BaseHTTPRequestHandler):
             if not os.path.exists(p):
                 return self.send_json({"error": "not found"}, 404)
             with open(p) as f:
-                meta, body = parse_front_matter(f.read())
+                text = f.read()
+            meta, body = parse_front_matter(text)
             return self.send_json({"slug": slug, "meta": meta, "markdown": body,
+                                   "body_line": body_line(text, body),
                                    "mtime": os.path.getmtime(p)})
         if path.startswith("/api/feedback/"):
             slug = safe_slug(path[len("/api/feedback/"):])
@@ -923,7 +960,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json({"slug": slug, "sha": sha, "meta": meta,
                                        "kind": "prototype"})
             meta, body = parse_front_matter(content)
-            return self.send_json({"slug": slug, "sha": sha, "meta": meta, "markdown": body})
+            return self.send_json({"slug": slug, "sha": sha, "meta": meta, "markdown": body,
+                                   "body_line": body_line(content, body)})
         if path.startswith("/raw/"):
             slug = safe_slug(path[len("/raw/"):])
             if doc_kind(slug) == "prototype":
@@ -989,9 +1027,17 @@ class Handler(BaseHTTPRequestHandler):
         if len(parts) >= 3 and parts[:2] == ["api", "feedback"]:
             slug = safe_slug("/".join(parts[2:]))
             item = self.read_body()
-            allowed = {"type", "quote", "prefix", "suffix", "section",
-                       "comment", "suggested_text", "images", "kind", "anchor"}
+            allowed = {"type", "quote", "prefix", "suffix", "section", "comment",
+                       "suggested_text", "images", "kind", "anchor", "at", "quote_len"}
             item = {k: v for k, v in item.items() if k in allowed}
+            if "quote" in item:
+                item["quote"] = cap_quote(item["quote"])
+            if "at" in item:
+                item["at"] = clean_at(item["at"])
+                if not item["at"]:
+                    del item["at"]
+            if "quote_len" in item and not (_num(item["quote_len"]) and item["quote_len"] > 0):
+                del item["quote_len"]
             if item.get("kind") not in (None, "pin", "screen"):
                 del item["kind"]
             if "anchor" in item:

@@ -17,6 +17,7 @@ Redline moves both into the browser and sends your feedback straight back to the
 
 - **Real documents, not scrollback.** Plans are versioned markdown files per project workspace, rendered with mermaid diagrams, tables and phase checklists.
 - **Review like a doc, not a diff.** Select any sentence and leave a comment or a suggested edit. Attach screenshots. When Claude has an open question, it becomes a red "Needs your reply" thread on the exact passage.
+- **Comments point at one exact place.** Each comment records the source lines and character offsets it was made on, plus a readable path like `Phase 2 › item 2`, while the markdown stays untouched. Repeated phrases never get mixed up, selections across bold, code and links highlight cleanly, and long selections reach Claude as a short `head … tail` quote plus the line numbers.
 - **An async loop.** Batch your notes and press "Send to Claude". The session picks them up through an inbox watcher without dropping what it was doing, edits the plan and bumps the version; the page updates live. "Run independently" hands the batch to a background agent so the main session's context stays clean.
 - **Plans that live on.** Every version is kept: the dropdown loads any past version, restores it or downloads it as `.md`. Plans survive `/clear`, compaction and restarts, and double as a progress board while Claude implements.
 
@@ -160,7 +161,8 @@ GET  /api/history/<slug>            {commits: [{sha, short, date, subject, versi
 GET  /api/history-at/<sha>/<slug>   the plan (or prototype meta) as of a commit
 GET  /raw/<slug>                    download: .md for a plan, .html or .zip for a prototype
 GET  /raw-at/<sha>/<slug>           the same download as of a commit
-POST /api/feedback/<slug>           add a draft {type, quote, section, prefix, suffix, comment, suggested_text, kind?, anchor?, images?}
+POST /api/feedback/<slug>           add a draft {type, quote, section, prefix, suffix, comment, suggested_text, kind?, anchor?, at?, images?}
+                                    plan anchor: {lines, where, s: {src, o}, e: {src, o}}; at: {version, sha}
 POST /api/feedback/<slug>/delete    {id} remove a draft
 POST /api/submit/<slug>             {independent?} drafts become submitted, writes an inbox signal
 POST /api/reply/<slug>              {id, text, images?} reply on an answered item, re-submits it
