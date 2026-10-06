@@ -1385,8 +1385,15 @@ def main():
     if old:
         # stdout may be parsed (--url), so the note goes to stderr
         print("Redline %s is running; replacing it with %s" % (old, VERSION), file=sys.stderr)
+        old_port = (read_runtime() or {}).get("port")
         if stop_server(out=sys.stderr) == 0:
             url = None
+            # an older server can free its lock just before its socket; wait
+            # so the new one keeps the same port and open tabs keep working
+            for _ in range(30):
+                if not old_port or not port_busy(old_port):
+                    break
+                time.sleep(0.1)
     lock = None
     if not url:
         lock = take_lock()
@@ -1417,6 +1424,11 @@ def main():
     try:
         srv4.serve_forever()
     finally:
+        # free the port before the lock, so a restart can take the same port
+        srv4.server_close()
+        if srv6:
+            srv6.shutdown()
+            srv6.server_close()
         clear_runtime()
         lock.close()
     return 0
