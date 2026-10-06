@@ -1,11 +1,13 @@
 ---
 name: plan-review
-description: Present implementation plans as HTML pages on the local Redline plan server instead of long terminal output. Use whenever the user asks for a project or feature plan, design doc, phased roadmap, or architecture proposal, when they say /plan-review, or when plan feedback needs processing. Serves mermaid diagrams, collects inline comments and suggested edits in the browser, and routes submitted feedback back into the session.
+description: Present implementation plans as HTML pages on the local Redline plan server instead of long terminal output, and build playable prototypes (clickable dummy apps or websites) the user reviews by pinning comments to components. Use whenever the user asks for a project or feature plan, design doc, phased roadmap, or architecture proposal; when they ask for a prototype, clickable mockup, dummy app, playable demo or interactive mock of any app or website; when they say /plan-review; or when plan or prototype feedback needs processing. Serves mermaid diagrams, collects inline comments, suggested edits and component pins in the browser, and routes submitted feedback back into the session.
 ---
 
-# Redline: the plan review workflow
+# Redline: the plan and prototype review workflow
 
-The user does not want long plans printed in the terminal. Plans are written as markdown files, served at http://localhost:4747 by Redline (the local plan server), reviewed in the browser, and revised through a feedback loop. Keep terminal output to a few lines; the plan lives in the browser.
+Redline reviews two kinds of documents: **plans** (markdown, sections 1 to 6) and **prototypes** (playable HTML dummies of an app or website, section 7). Both share the inbox, feedback files, version history and the review rail.
+
+The user does not want long plans printed in the terminal. Plans are written as markdown files, served at http://127.0.0.1:4747 by Redline (the local plan server), reviewed in the browser, and revised through a feedback loop. Keep terminal output to a few lines; the plan lives in the browser.
 
 The server root is `~/.claude/plan-server` (the directory containing `server.py`; adjust every path below if it was cloned somewhere else). Use absolute paths when passing them to tools.
 
@@ -37,11 +39,11 @@ git -C ~/.claude/plan-server/plans commit -m "<workspace>/<slug>: v1"
 ## 2. Serve and open
 
 ```
-curl -sf http://localhost:4747/api/health >/dev/null 2>&1 \
+curl -sf http://127.0.0.1:4747/api/health >/dev/null 2>&1 \
   || echo "server down"
 ```
 
-If down, start it with Bash `run_in_background`: `python3 ~/.claude/plan-server/server.py`. Then open `http://localhost:4747/plan/<workspace>/<slug>` in the browser (`open <url>` on macOS, `xdg-open <url>` on Linux, `start <url>` on Windows).
+If down, start it with Bash `run_in_background`: `python3 ~/.claude/plan-server/server.py`. Then open `http://127.0.0.1:4747/plan/<workspace>/<slug>` in the browser: `open <url>` on macOS, `xdg-open <url>` on Linux, `start <url>` on Windows. Always use `127.0.0.1`, never `localhost`. The server binds IPv4 only, and another dev server listening on the same port over IPv6 would answer `localhost` instead.
 
 ## 3. Watch the inbox (your workspace only)
 
@@ -79,19 +81,21 @@ Never restart, re-plan, or drop in-flight work because feedback arrived.
   phase('Process')
   return await agent(`Process plan review feedback exactly per section 4 of
   ~/.claude/plan-server/skill/SKILL.md. Slug: <slug>.
-  Plan: ~/.claude/plan-server/plans/<slug>.md
+  Plan: ~/.claude/plan-server/plans/<slug>.md (a prototype instead:
+  ~/.claude/plan-server/plans/<slug>.proto/index.html, see section 7)
   Feedback: ~/.claude/plan-server/feedback/<slug>.json
   Claimed inbox file to delete when done: <path>
   Read attached images, apply edits, resolve or answer every submitted item
   (resolution summaries or thread entries plus answered status), bump version
-  and updated, then commit the plan file (git -C ~/.claude/plan-server add/commit,
-  see step 4). Return a one-line summary of what changed.`)
+  and updated, then commit in the nested plans repo
+  (git -C ~/.claude/plan-server/plans add/commit, see step 4).
+  Return a one-line summary of what changed.`)
   ```
 
   Use a pipeline over items instead of the single agent only when the batch is large. If there is no Workflow tool, spawn a background subagent with the Agent tool using the same prompt. If neither exists, fall back to processing inline. A background run continues while you work on your own task; when its notification arrives, relay the one-line outcome. Do not wait for it, poll it, or open the feedback file yourself.
 - `"inline"` or missing: process it in this session, subject to the triage rule above.
 
-Read the claimed inbox file to get the slug, then read `~/.claude/plan-server/feedback/<workspace>/<slug>.json`. For every item with `"status": "submitted"`:
+Read the claimed inbox file to get the slug, then read `~/.claude/plan-server/feedback/<workspace>/<slug>.json`. The inbox JSON's `kind` is `plan` or `prototype`; for a prototype, also follow the pin rules in section 7. For every item with `"status": "submitted"`:
 
 - Items carry: `type` (comment or edit), `quote` (the selected text as rendered, so markdown syntax like `**` or backticks is stripped), `section` (nearest heading), `prefix`/`suffix` (surrounding rendered text), `comment`, for edits `suggested_text`, and possibly a `thread` array of `{who, text, at}` messages if the item has been discussed before (`who` is `user` or `claude`).
 - Items and thread messages may carry `images`: screenshots the user attached, as `/uploads/<file>` paths that map to `~/.claude/plan-server/uploads/<file>`. Always Read those files; they are usually the core of the feedback, not decoration.
@@ -102,7 +106,7 @@ Read the claimed inbox file to get the slug, then read `~/.claude/plan-server/fe
   - Fully handled: set `"status": "resolved"` and write `"resolution"`: a 1-2 line summary of what was decided or changed. Delete the item's `"thread"` and legacy `"reply"` fields; resolved cards show only the summary, never the trail. The server also compacts resolved items automatically on load (drops comment, thread, prefix and suffix), so feedback files stay small; never re-read or reason over resolved items when processing new feedback, only items with `"status": "submitted"` matter.
   - Needs the user's answer (open question, a choice between options, an unclear ask): append `{"who": "claude", "text": "...", "at": <epoch seconds>}` to the item's `"thread"` array and set `"status": "answered"`. The page shows these in red under "Needs your reply" and the index flags the plan. When the user replies in the browser, the item flips back to `"submitted"` and a new inbox file appears, so the watcher loop picks the conversation up again.
 - Bump `version` and `updated` in the plan front matter. The browser polls every 2.5s and shows the new version plus replies automatically.
-- Commit the bump: `git -C ~/.claude/plan-server add plans/<workspace>/<slug>.md && git -C ~/.claude/plan-server commit -m "<workspace>/<slug>: v<N> - <what changed>"`. This is what makes the previous version recoverable; skipping it silently loses v<N-1>.
+- Commit the bump in the nested plans repo: `git -C ~/.claude/plan-server/plans add <workspace>/<slug>.md && git -C ~/.claude/plan-server/plans commit -m "<workspace>/<slug>: v<N> - <what changed>"` (a prototype: `add <workspace>/<slug>.proto`). This is what makes the previous version recoverable; skipping it silently loses v<N-1>. Never run these against `~/.claude/plan-server` itself: `plans/` is ignored there, so the add fails and the version is lost.
 - Delete the processed `inbox/<workspace>__<slug>.json.claimed` file.
 - Tell the user in one or two lines what changed; do not restate the plan in the terminal.
 
@@ -114,12 +118,65 @@ When the user approves, implement phase by phase and keep the plan current: tick
 
 The page itself has a version dropdown in the header (next to the title): switching it loads any past commit read-only, with a "Restore this version" button (commits the old content back as a new version, nothing destructive) and a "↓ .md" download button (works on the live version or whichever historical one is selected) for handing someone a plain file without needing git. Point the user at that dropdown instead of asking them to run git.
 
-For your own lookups, every bump is a commit, so history is plain git on `~/.claude/plan-server`:
+For your own lookups, every bump is a commit, so history is plain git on the nested plans repo:
 
 ```
-git -C ~/.claude/plan-server log --oneline -- plans/<workspace>/<slug>.md
-git -C ~/.claude/plan-server show <sha>:plans/<workspace>/<slug>.md
-git -C ~/.claude/plan-server diff <sha1> <sha2> -- plans/<workspace>/<slug>.md
+git -C ~/.claude/plan-server/plans log --oneline -- <workspace>/<slug>.md
+git -C ~/.claude/plan-server/plans show <sha>:<workspace>/<slug>.md
+git -C ~/.claude/plan-server/plans diff <sha1> <sha2> -- <workspace>/<slug>.md
 ```
+
+For a prototype use the folder path `<workspace>/<slug>.proto` (and `<workspace>/<slug>.proto/index.html` with `show`).
 
 If the user asks to see or compare an older version, use these rather than trying to reconstruct it from the feedback JSON (resolved items get compacted and don't hold the old plan body).
+
+## 7. Prototypes: playable dummies with component comments
+
+When the user asks for a prototype, clickable mockup, dummy app or playable demo of an app or website (or says yes when you offer one for a UI-heavy plan), build it as a Redline prototype instead of a plan. Offer one in a single line when a plan is UI heavy; never build one unasked.
+
+### Layout and front matter
+
+A prototype is a folder next to the plans: `~/.claude/plan-server/plans/<workspace>/<slug>.proto/` with `index.html` as the entry and optional `assets/`. Pick a slug that no plan in the workspace uses. Front matter is the usual block wrapped in the first HTML comment of `index.html`; the server strips it before serving:
+
+```html
+<!--
+---
+title: Checkout flow
+version: 1
+status: in review
+updated: YYYY-MM-DD
+device: mobile
+plan: <workspace>/<plan-slug>
+---
+-->
+<!doctype html>
+```
+
+`device` (mobile, tablet or desktop) picks the default frame. `plan` links the prototype to a plan; a plan links back with `prototype: <workspace>/<slug>` in its own front matter. Commit v1 in the plans repo (`git -C ~/.claude/plan-server/plans add <workspace>/<slug>.proto`, then commit `<workspace>/<slug>: v1`), then open `http://127.0.0.1:4747/proto/<workspace>/<slug>` and arm the inbox watcher exactly as for plans.
+
+### The contract
+
+1. **Self-contained.** Inline CSS and JS (or files under `assets/`). Icons are inline SVG; a brand gets a drawn SVG logo mark, never plain text; no emoji as icons. It must work at phone and desktop widths. Follow any UI preferences the user has stated.
+2. **Screens.** Every screen is an element with `data-rl-screen="cart"` and `data-rl-title="Cart"`; navigation uses the hash (`#/cart`, `#/product/3`, `#/cart?state=empty`). The shell's screen picker, pin navigation and live reload all rely on this. Any framework is fine as long as these rules hold.
+3. **Component ids.** Every element worth commenting on carries `data-rl="<screen>.<thing>"`, e.g. `data-rl="cart.checkout-button"`. Repeated items (cards in a list) share one id; their text tells them apart. **Never rename or drop an id when editing**; pins anchor to them across versions. When a component is genuinely removed, say so in the resolution.
+4. **Playable.** Every visible button and link does something: navigates, toggles, opens a sheet, shows a toast. Forms validate with fake rules. Lists use realistic dummy data and volume. Empty, loading and error states are reachable through `?state=` switches.
+5. **Fake everything.** State lives in memory; no real network calls, credentials or payments. The page runs in a sandboxed iframe with an opaque origin: storage is shimmed in memory, cookies are unavailable, and Reset reloads to a clean state. Keep dummy data deterministic (seeded) so text, and therefore anchors, stay stable across reloads.
+6. **Real sites.** When the user names an existing website or app, look at it for reference (browser screenshots if a browser tool is available), then rebuild the layout with dummy data and placeholder branding. Do not mirror the site, copy its assets or reuse its logo.
+7. **Offline by default.** Prefer vanilla JS plus the optional kit. Pull a framework from cdnjs or jsdelivr only when the prototype genuinely needs one.
+
+The optional kit at `/static/kit.js` covers most needs: `Kit.screen(name, render)`, `Kit.start({home})`, `Kit.go(path)`, `Kit.back()`, `Kit.state()` for `?state=`, `data-go="cart"` and `data-back` attributes, `Kit.fake` (seeded names, cities, prices, dates, words, SVG initial avatars), `Kit.money`, `Kit.toast`, `Kit.sheet`, `Kit.modal`, `Kit.skeleton` and `Kit.delay`. `examples/plan-server/sprout-shop.proto/index.html` in the Redline repo is a complete five-screen example to copy patterns from.
+
+### What the user does
+
+In the browser the user clicks through the prototype, presses `C` for Comment mode, then clicks a component (the nearest `data-rl` ancestor wins, `Alt` picks the exact element) or drags a box over an area. Each pin gets a comment or a "Suggest copy" edit, plus an automatic screenshot of the element or area. Pins, screen notes and general notes collect in the rail and go out with Send to Claude like plan feedback.
+
+### Processing prototype feedback
+
+Same loop as section 4, with these differences:
+
+- Items with `"kind": "pin"` carry an `anchor`: `screen`, `title`, `route`, `component` (the `data-rl` id), `selector`, `tag`, `text`, `offset` (where on the element they clicked, as fractions), `box` (for an area pin, the area as fractions of the anchored element), and `viewport`. `section` is the screen title and `quote` the element's text. `"kind": "screen"` items are notes about a whole screen.
+- Find the element by `component` first (grep `data-rl="<id>"` in `index.html`), then by `selector` and `text`. Always open the attached screenshots; they show the state the user saw (an open sheet, a filled form) that the source alone does not.
+- `edit` items are copy changes: `quote` is the current text, `suggested_text` the replacement.
+- Keep every `data-rl` id stable. Bump `version` and `updated` in the front matter comment, then commit the folder: `git -C ~/.claude/plan-server/plans add <workspace>/<slug>.proto && git -C ~/.claude/plan-server/plans commit -m "<workspace>/<slug>: v<N> - <what changed>"`.
+- When a change is visual and a browser tool is available, check the touched screen at `http://127.0.0.1:4747/p/<workspace>/<slug>/#/<screen>` before resolving.
+- The page reloads the prototype on the same screen when files change, toasts the new version, and shows resolved pins in green.

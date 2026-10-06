@@ -1,6 +1,6 @@
 # Redline
 
-Google-Docs-style plan review for Claude Code. Plans become versioned markdown pages in your browser, with mermaid diagrams, inline comments, and suggested edits that flow straight back into the Claude session that wrote them.
+Google-Docs-style plan review for Claude Code. Plans become versioned markdown pages in your browser, with mermaid diagrams, inline comments, and suggested edits that flow straight back into the Claude session that wrote them. Ask for a prototype instead and Claude builds a playable dummy of the app or website; you click through it and pin comments straight onto its components.
 
 **Site: [redline.algofunds.in](https://redline.algofunds.in)**
 
@@ -14,17 +14,18 @@ Standard plan mode prints a wall of text in the terminal and gives you one accep
 - **Review like a doc, not a diff.** Select any sentence and leave a comment or a suggested edit. Attach screenshots. When Claude has an open question, it becomes a thread on the exact passage.
 - **An async loop.** Review at your own pace while Claude keeps working. Batch your notes and press "Send to Claude"; the session picks them up through an inbox watcher without dropping what it was doing. A "Run independently" toggle hands the batch to a background agent so your main session's context stays clean.
 - **Plans that live on.** They survive `/clear`, context compaction, and session restarts, and double as a progress board during implementation: checkboxes get ticked, versions bump, status chips flip.
-- **Zero dependencies.** One Python stdlib file. marked and mermaid are vendored, so it works offline.
+- **Playable prototypes.** Claude builds a clickable dummy of any app or website (real screens, fake data, every button does something) and Redline shows it in a phone, tablet or desktop frame. Press `C`, click any component, and pin a comment or a copy change to it; Claude gets the screen, the component id, a screenshot of what you saw, and edits the prototype in place.
+- **Zero dependencies.** One Python stdlib file. marked, mermaid and html-to-image are vendored, so it works offline.
 
 ## Quick start
 
 ```bash
 git clone https://github.com/NikkyAmresh/redline ~/.claude/plan-server
 ln -s ../plan-server/skill ~/.claude/skills/plan-review
-python3 ~/.claude/plan-server/server.py     # http://localhost:4747
+python3 ~/.claude/plan-server/server.py     # http://127.0.0.1:4747
 ```
 
-Then in any Claude Code session, ask for a plan (or say `/plan-review`). Claude writes the plan as markdown, opens it in your browser, and arms a watcher for your feedback. The example plan (seeded into `plans/` from `examples/` on first start) at `http://localhost:4747/plan/plan-server/v1` is itself a live demo: select a sentence and try it.
+Then in any Claude Code session, ask for a plan (or say `/plan-review`). Claude writes the plan as markdown, opens it in your browser, and arms a watcher for your feedback. The example plan (seeded into `plans/` from `examples/` on first start) at `http://127.0.0.1:4747/plan/plan-server/v1` is itself a live demo: select a sentence and try it. So is the example prototype at `http://127.0.0.1:4747/proto/plan-server/sprout-shop`: press `C` and click anything.
 
 Requirements: Python 3.7+, Claude Code. macOS and Linux are supported; the skill's shell snippets are POSIX.
 
@@ -47,18 +48,34 @@ inbox/*.json ◀──on submit── server.py :4747 ◀──poll/POST── b
 4. A watcher inside the Claude session claims the signal, applies edits, answers questions, bumps the version. The page polls every 2.5s and shows the new version plus replies.
 5. Open questions come back as red "Needs your reply" threads; replying re-submits the item, so the conversation continues on the passage itself.
 
+## Prototypes
+
+Ask Claude for a prototype, clickable mockup or dummy app and it writes one into `plans/<workspace>/<slug>.proto/index.html`, then opens `/proto/<workspace>/<slug>`:
+
+- **Stage.** The prototype runs in a phone (390 wide), tablet (820) or desktop frame, scaled to fit, with optional device chrome. A screen picker jumps between screens; Reset reloads it to a clean state.
+- **Comment mode** (`C`, `Esc` to leave). Hovering outlines the component under the cursor; clicking pins a comment to it, or a "Suggest copy" edit for text. Hold `Alt` for the exact element, or drag a box to comment on an area. Each pin gets an automatic screenshot.
+- **Pins that survive edits.** Pins anchor to `data-rl` component ids (with selector and text fallbacks), so they stay put when Claude changes the prototype. A pin whose component is gone is flagged as detached. Clicking a card in the rail jumps to the pin's screen.
+- **Same loop as plans.** Drafts, Send to Claude, threads, version history (the dropdown loads any past version of the prototype), restore, and download as `.html` or `.zip`.
+
+The contract Claude follows (screens as `data-rl-screen` sections with hash routes, stable `data-rl` ids, everything playable, fake data only) lives in `skill/SKILL.md`, section 7. `static/kit.js` is an optional helper (router, seeded dummy data, toast, sheet, modal) and `examples/plan-server/sprout-shop.proto/` is a five screen example.
+
 ## Layout
 
 ```
-server.py        http server: plans, feedback, submit, inbox signals (stdlib only)
-viewer.html      review UI: rendering, selection toolbar, review rail, polling
+server.py        http server: plans, prototypes, feedback, submit, inbox signals (stdlib only)
+viewer.html      plan review UI: rendering, selection toolbar, polling
+prototype.html   prototype review UI: device stage, Comment mode, pins
+static/          rail.js + redline.css (review rail shared by both pages),
+                 bridge.js (injected into prototypes), kit.js (optional prototype helpers)
 skill/SKILL.md   the Claude Code skill driving the whole workflow
 docs/            landing page (redline.algofunds.in, a Cloudflare Worker serving static assets)
 plans/<workspace>/*.md       one plan per file, grouped by project workspace
+plans/<workspace>/*.proto/   one prototype per folder, index.html is the entry
 feedback/<workspace>/*.json  comments and edits; draft / submitted / answered / resolved
 inbox/*.json                 submit signals claimed by the Claude session
 uploads/         screenshots pasted or dropped onto feedback
-vendor/          marked.min.js, mermaid.min.js (both MIT)
+vendor/          marked.min.js, mermaid.min.js, html-to-image.min.js (all MIT)
+examples/        the example plan and prototype seeded on first start
 ```
 
 Plans, feedback, inbox, and uploads are gitignored; your review data stays on your machine.
@@ -69,11 +86,15 @@ Slugs are workspace-qualified paths: `<workspace>/<name>`.
 
 ```
 GET  /                        index of plans, grouped by workspace
-GET  /plan/<slug>             viewer page
+GET  /plan/<slug>             plan viewer page
+GET  /proto/<slug>            prototype viewer page
+GET  /p/<slug>/<path>         prototype files (sandboxed, bridge injected)
+GET  /p-at/<sha>/<slug>/<path>   prototype files as of a commit
+GET  /api/proto/<slug>        {slug, kind, meta, mtime}
 GET  /api/health
 GET  /api/plan/<slug>         {slug, meta, markdown, mtime}
 GET  /api/feedback/<slug>     {items: [...]}
-POST /api/feedback/<slug>     add draft {type, quote, section, prefix, suffix, comment, suggested_text}
+POST /api/feedback/<slug>     add draft {type, quote, section, prefix, suffix, comment, suggested_text, kind?, anchor?}
 POST /api/feedback/<slug>/delete   {id} remove a draft
 POST /api/submit/<slug>       {independent?} drafts -> submitted, writes an inbox signal
 POST /api/reply/<slug>        {id, text, images?} reply on an answered item, re-submits it
@@ -82,7 +103,7 @@ POST /api/upload/<slug>       {data: base64 image data url} -> {url: /uploads/<f
 
 ## Security notes
 
-The server binds `127.0.0.1` only, rejects foreign `Host` headers (DNS rebinding), and has no auth by design: it is a personal, single-reviewer tool. Do not expose it to a network. Feedback text drives an agent with shell access, so treat anything that reaches the inbox as trusted input; if you ever put it behind a tunnel for someone else, add auth and review every batch before Claude processes it.
+The server binds `127.0.0.1` only, rejects foreign `Host` headers (DNS rebinding), and only accepts JSON POSTs from its own origin, so other pages open in your browser cannot plant feedback. Prototypes run sandboxed with an opaque origin (an iframe without `allow-same-origin`, plus a CSP `sandbox` header when opened directly), so prototype code and any CDN script it loads cannot call the API. It has no auth by design: it is a personal, single-reviewer tool. Do not expose it to a network. Feedback text drives an agent with shell access, so treat anything that reaches the inbox as trusted input; if you ever put it behind a tunnel for someone else, add auth and review every batch before Claude processes it.
 
 ## License
 

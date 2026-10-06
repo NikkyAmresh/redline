@@ -1,0 +1,589 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Redline</title>
+<link rel="stylesheet" href="/static/redline.css">
+<script src="/static/rail.js"></script>
+<style>
+html, body { height:100%; }
+body {
+  background:var(--paper); color:var(--ink); overflow:hidden;
+  font:14px/1.5 -apple-system, "Helvetica Neue", sans-serif;
+  display:flex; flex-direction:column;
+}
+svg { flex:none; }
+
+/* ---------- toolbar ---------- */
+#toolbar {
+  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  padding:8px 24px; border-bottom:1px solid var(--line); background:var(--paper);
+  font-size:13px;
+}
+.seg { display:inline-flex; border:1px solid var(--line); border-radius:9px; padding:2px;
+       background:var(--surface); }
+.seg button {
+  display:inline-flex; align-items:center; gap:6px; border:0; background:none;
+  color:var(--muted); padding:5px 10px; border-radius:7px; cursor:pointer;
+  font:13px -apple-system, "Helvetica Neue", sans-serif;
+}
+.seg button svg { width:15px; height:15px; }
+.seg button:hover { color:var(--ink); }
+.seg button.on { background:var(--accent-soft); color:var(--accent); }
+.seg button:disabled { opacity:.4; cursor:default; }
+.seg kbd { font:10px ui-monospace, Menlo, monospace; border:1px solid currentColor;
+           border-radius:4px; padding:0 4px; opacity:.7; }
+.tsel {
+  appearance:none; -webkit-appearance:none; border:1px solid var(--line); border-radius:9px;
+  background:var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%236c7180' stroke-width='1.5'/%3E%3C/svg%3E") no-repeat right 10px center;
+  color:var(--ink); padding:6px 28px 6px 10px; font:13px -apple-system, sans-serif;
+  max-width:220px; cursor:pointer;
+}
+.tbtn {
+  display:inline-flex; align-items:center; gap:6px; border:1px solid var(--line);
+  border-radius:9px; background:var(--surface); color:var(--muted); padding:6px 10px;
+  font:13px -apple-system, sans-serif; cursor:pointer; text-decoration:none;
+}
+.tbtn svg { width:14px; height:14px; }
+.tbtn:hover { color:var(--accent); border-color:var(--accent); }
+.spacer { flex:1; }
+#toolbar .switch { font-size:12.5px; }
+
+/* ---------- stage and device ---------- */
+main { flex:1; min-height:0; display:flex; }
+#stage {
+  flex:1; min-width:0; position:relative; overflow:hidden;
+  display:flex; align-items:center; justify-content:center;
+  background-color:var(--paper);
+  background-image:radial-gradient(color-mix(in srgb, var(--muted) 28%, transparent) 1px, transparent 1px);
+  background-size:18px 18px;
+}
+#stage.desktop { align-items:stretch; justify-content:stretch; padding:18px; }
+#fit { position:relative; flex:none; }
+#stage.desktop #fit { flex:1; display:flex; }
+#device {
+  position:absolute; left:0; top:0; transform-origin:0 0;
+  display:flex; flex-direction:column; overflow:hidden;
+  background:#fff; border-radius:28px; border:1px solid var(--line);
+  box-shadow:0 24px 60px rgba(20,22,30,.18), 0 2px 8px rgba(20,22,30,.08);
+}
+#device.chrome { border:12px solid #15171c; border-radius:56px; }
+#device.tablet.chrome { border-width:16px; border-radius:40px; }
+#stage.desktop #device { position:static; flex:1; border-radius:12px; border:1px solid var(--line); }
+#frame { flex:1; width:100%; border:0; display:block; background:#fff; }
+.statusbar, .homebar, .browserbar { display:none; flex:none; background:#fff; color:#111; }
+#device.chrome .statusbar { display:flex; align-items:center; justify-content:space-between;
+  height:47px; padding:0 30px 0 34px; font:600 15px -apple-system, sans-serif; }
+#device.tablet.chrome .statusbar { height:26px; padding:0 22px; font-size:12px; }
+.statusbar .icons { display:flex; gap:6px; align-items:center; }
+.statusbar svg { height:12px; width:auto; }
+#device.chrome .homebar { display:flex; height:30px; align-items:center; justify-content:center; }
+#device.tablet.chrome .homebar { height:22px; }
+.homebar span { width:134px; height:5px; border-radius:3px; background:#111; }
+#device.desktop.chrome .statusbar, #device.desktop.chrome .homebar { display:none; }
+#device.desktop.chrome .browserbar {
+  display:flex; align-items:center; gap:8px; height:38px; padding:0 14px;
+  background:#f1f1f3; border-bottom:1px solid #e3e3e8;
+}
+.browserbar i { width:11px; height:11px; border-radius:50%; background:#d6d6db; display:block; }
+.browserbar i:nth-child(1) { background:#ff5f57; }
+.browserbar i:nth-child(2) { background:#febc2e; }
+.browserbar i:nth-child(3) { background:#28c840; }
+.browserbar .url { flex:1; margin:0 60px 0 14px; height:24px; border-radius:7px; background:#fff;
+  border:1px solid #e3e3e8; color:#6b7280; font:12px ui-monospace, Menlo, monospace;
+  display:flex; align-items:center; padding:0 10px; overflow:hidden; white-space:nowrap; }
+#modehint {
+  position:absolute; left:50%; bottom:16px; transform:translateX(-50%);
+  background:var(--ink); color:var(--paper); border-radius:999px; padding:7px 14px;
+  font:12.5px -apple-system, sans-serif; box-shadow:var(--shadow); pointer-events:none;
+  display:none; white-space:nowrap;
+}
+#modehint.on { display:block; }
+#modehint kbd { font:11px ui-monospace, Menlo, monospace; opacity:.75; }
+
+#rail { position:static; height:auto; }
+
+@media (max-width: 980px) {
+  body { overflow:auto; height:auto; }
+  main { flex-direction:column; }
+  #stage { height:78vh; flex:none; }
+  #toolbar { padding:8px 16px; }
+  header { padding:12px 16px; }
+  .wide { display:none !important; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <a href="/">Redline</a><span style="color:var(--muted)">/</span>
+  <span id="title">&hellip;</span>
+  <select class="pill version" id="version"><option value="__live__" selected>v&hellip; (live)</option></select>
+  <span class="pill" id="pstatus"></span>
+  <a class="pill" id="planlink" hidden title="Open the plan behind this prototype"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5"/></svg>plan</a>
+  <button class="pill" id="download" title="Download this version">&#8595; download</button>
+  <span id="live"><span class="dot"></span><span id="livetext">connecting</span></span>
+</header>
+
+<div id="histbar">
+  <span id="histtext"></span>
+  <button id="histrestore">Restore this version</button>
+  <button id="histback">Back to live</button>
+</div>
+
+<div id="toolbar">
+  <div class="seg" id="modes">
+    <button data-mode="interact" class="on" title="Use the prototype"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3l14 8-6 2-3 6z"/></svg>Interact</button>
+    <button data-mode="comment" title="Click any component to comment on it (C)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20.5l1.4-4.9A8 8 0 1 1 21 12z"/></svg>Comment <kbd>C</kbd></button>
+  </div>
+  <div class="seg" id="devices">
+    <button data-device="mobile" title="Phone, 390 wide"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2.5" width="10" height="19" rx="2"/><path d="M11 18.5h2"/></svg><span class="wide">Phone</span></button>
+    <button data-device="tablet" title="Tablet, 820 wide"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2.5" width="16" height="19" rx="2"/><path d="M11 18.5h2"/></svg><span class="wide">Tablet</span></button>
+    <button data-device="desktop" title="Desktop, fills the stage"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="4" width="19" height="12.5" rx="1.5"/><path d="M8.5 20.5h7M12 16.5v4"/></svg><span class="wide">Desktop</span></button>
+  </div>
+  <select class="tsel" id="screen" title="Jump to a screen"><option>screens</option></select>
+  <button class="tbtn" id="reset" title="Reload the prototype and reset its state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg><span class="wide">Reset</span></button>
+  <span class="spacer"></span>
+  <label class="switch wide" title="Show pins that are already resolved"><input type="checkbox" id="showres"><span class="track"></span>Resolved</label>
+  <label class="switch wide" title="Draw device chrome around the prototype"><input type="checkbox" id="chrome"><span class="track"></span>Chrome</label>
+  <a class="tbtn" id="newtab" target="_blank" rel="noopener" title="Open the prototype alone in a new tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg><span class="wide">Open</span></a>
+</div>
+
+<main>
+  <section id="stage">
+    <div id="fit">
+      <div id="device">
+        <div class="statusbar"><span>9:41</span><span class="icons">
+          <svg viewBox="0 0 18 12"><rect x="0" y="8" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="5.5" width="3" height="6.5" rx="1" fill="currentColor"/><rect x="10" y="3" width="3" height="9" rx="1" fill="currentColor"/><rect x="15" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg>
+          <svg viewBox="0 0 16 12"><path d="M8 11.5l2.4-2.9a3.6 3.6 0 0 0-4.8 0z" fill="currentColor"/><path d="M3.6 6.3a6.6 6.6 0 0 1 8.8 0M1.2 3.6a10 10 0 0 1 13.6 0" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+          <svg viewBox="0 0 27 12"><rect x=".5" y=".5" width="23" height="11" rx="3" fill="none" stroke="currentColor" opacity=".45"/><rect x="2" y="2" width="20" height="8" rx="2" fill="currentColor"/><path d="M25 4v4a2 2 0 0 0 0-4z" fill="currentColor" opacity=".45"/></svg>
+        </span></div>
+        <div class="browserbar"><i></i><i></i><i></i><span class="url" id="url"></span></div>
+        <iframe id="frame" title="Prototype" sandbox="allow-scripts allow-forms allow-modals allow-popups allow-downloads"></iframe>
+        <div class="homebar"><span></span></div>
+      </div>
+    </div>
+    <div id="modehint">Comment mode: click a component, drag a box for an area, hold <kbd>Alt</kbd> for the exact element, <kbd>Esc</kbd> to stop</div>
+  </section>
+  <aside id="rail"></aside>
+</main>
+
+<script>
+const slug = location.pathname.split('/').filter(Boolean).slice(1).map(decodeURIComponent).join('/');
+const {api, toast, esc} = Redline;
+const frame = document.getElementById('frame');
+const stage = document.getElementById('stage');
+const fit = document.getElementById('fit');
+const device = document.getElementById('device');
+
+const DEVICES = {
+  mobile: {w: 390, h: 844, bars: [47, 30], border: 12},
+  tablet: {w: 820, h: 1180, bars: [26, 22], border: 16},
+  desktop: null,
+};
+
+const state = {
+  proto: null, mode: 'interact', device: null, chrome: true, showResolved: false,
+  screens: [], screen: '', title: '', route: '', detached: new Set(),
+  history: [], historySha: null, shots: new Map(), focusAfterLoad: null, loads: 0,
+};
+
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} },
+};
+
+function setLive(on) {
+  const el = document.getElementById('live');
+  el.classList.toggle('on', on);
+  document.getElementById('livetext').textContent = on ? 'live' : 'server offline';
+}
+
+function post(msg) {
+  if (frame.contentWindow) frame.contentWindow.postMessage(Object.assign({__redline: 1}, msg), '*');
+}
+
+function base() {
+  return state.historySha ? '/p-at/' + state.historySha + '/' + slug + '/' : '/p/' + slug + '/';
+}
+
+/* ---------- review rail ---------- */
+
+const rail = Redline.mount({
+  slug,
+  rail: document.getElementById('rail'),
+  hint: 'Press <kbd>C</kbd> or pick Comment, then click any component in the prototype to pin a ' +
+        'comment or a copy change to it. Drag a box to comment on an area. ' +
+        'Drafts collect here; send them to Claude in one batch.',
+  actions: [
+    {label: '+ Note on this screen', title: 'A note about the screen on show, not one component',
+     onClick: () => openScreenNote()},
+    {label: '+ General note', title: 'A note about the whole prototype',
+     onClick: () => rail.openForm('comment', {label: 'General note on the whole prototype', rect: null})},
+  ],
+  decorate: item => {
+    const a = item.anchor;
+    if (!a) return {};
+    if (item.kind === 'screen') return {where: 'note on this screen'};
+    const detached = state.detached.has(item.id) && item.status !== 'resolved';
+    return {
+      num: pinNumber(item.id),
+      where: a.component || (a.tag ? a.tag + (a.box ? ' area' : '') : ''),
+      chip: detached ? '<span class="chip detached" title="This component is no longer found on its screen">detached</span>' : '',
+    };
+  },
+  onCardClick: item => {
+    const a = item.anchor;
+    if (!a || state.historySha) return;
+    if (state.detached.has(item.id)) toast('This component is no longer on its screen; Claude still has the details');
+    post({type: 'goto', route: a.route, screen: a.screen, focus: item.kind === 'pin' ? item.id : null});
+  },
+  refresh: () => refresh(),
+});
+
+function openScreenNote() {
+  if (state.historySha) return;
+  const title = state.title || state.screen || 'this screen';
+  rail.openForm('comment', {
+    label: 'Note on the ' + title + ' screen', rect: null,
+    extra: {kind: 'screen', section: title, quote: '',
+            anchor: {screen: state.screen, title, route: state.route,
+                     viewport: {name: state.device, w: frame.clientWidth, h: frame.clientHeight}}},
+  });
+}
+
+// pins are numbered in the order they were made, the same on cards and markers
+function pinList() {
+  let n = 0;
+  return rail.items().filter(i => i.kind === 'pin' && i.anchor)
+    .map(i => ({id: i.id, n: ++n, status: i.status, anchor: i.anchor}));
+}
+
+function pinNumber(id) {
+  const p = pinList().find(x => x.id === id);
+  return p ? p.n : null;
+}
+
+function sendPins() {
+  const pins = state.historySha ? [] : pinList();
+  post({type: 'pins', pins, showResolved: state.showResolved});
+}
+
+/* ---------- device stage ---------- */
+
+function setDevice(name, remember) {
+  if (!(name in DEVICES)) name = 'mobile';
+  state.device = name;
+  if (remember) store.set('rl-device:' + slug, name);
+  document.querySelectorAll('#devices button').forEach(b =>
+    b.classList.toggle('on', b.dataset.device === name));
+  device.className = name + (state.chrome ? ' chrome' : '');
+  stage.classList.toggle('desktop', name === 'desktop');
+  layoutStage();
+}
+
+function layoutStage() {
+  const d = DEVICES[state.device];
+  if (!d) {
+    device.style.width = device.style.height = device.style.transform = '';
+    fit.style.width = fit.style.height = '';
+    return;
+  }
+  const border = state.chrome ? d.border : 1;
+  const W = d.w + border * 2, H = d.h + border * 2;
+  // the iframe keeps the true device width; chrome bars come out of the height
+  device.style.width = W + 'px';
+  device.style.height = H + 'px';
+  const pad = 36;
+  const s = Math.min(1, (stage.clientWidth - pad * 2) / W, (stage.clientHeight - pad * 2) / H);
+  device.style.transform = 'scale(' + s + ')';
+  fit.style.width = W * s + 'px';
+  fit.style.height = H * s + 'px';
+}
+
+new ResizeObserver(layoutStage).observe(stage);
+
+document.getElementById('devices').onclick = e => {
+  const b = e.target.closest('[data-device]');
+  if (b) setDevice(b.dataset.device, true);
+};
+
+const chromeBox = document.getElementById('chrome');
+chromeBox.checked = state.chrome = store.get('rl-chrome') !== '0';
+chromeBox.onchange = () => {
+  state.chrome = chromeBox.checked;
+  store.set('rl-chrome', state.chrome ? '1' : '0');
+  setDevice(state.device);
+};
+
+const showres = document.getElementById('showres');
+showres.onchange = () => { state.showResolved = showres.checked; sendPins(); };
+
+/* ---------- modes ---------- */
+
+function setMode(m) {
+  if (state.historySha) m = 'interact';
+  state.mode = m;
+  document.querySelectorAll('#modes button').forEach(b =>
+    b.classList.toggle('on', b.dataset.mode === m));
+  document.getElementById('modehint').classList.toggle('on', m === 'comment');
+  post({type: 'mode', mode: m});
+}
+
+document.getElementById('modes').onclick = e => {
+  const b = e.target.closest('[data-mode]');
+  if (b && !b.disabled) setMode(b.dataset.mode);
+};
+
+function onKey(key) {
+  if (key === 'Escape') {
+    if (rail.isFormOpen()) rail.closeForm();
+    else if (state.mode === 'comment') setMode('interact');
+  } else if (key === 'c' && !rail.isFormOpen() && !state.historySha) {
+    setMode(state.mode === 'comment' ? 'interact' : 'comment');
+  }
+}
+
+document.addEventListener('keydown', e => {
+  const t = e.target;
+  if (t && t.matches && t.matches('input, textarea, select')) return;
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  if (e.key === 'c' || e.key === 'C') onKey('c');
+  else if (e.key === 'Escape') onKey('Escape');
+});
+
+/* ---------- frame ---------- */
+
+function frameUrl(route, at) {
+  route = route || '';
+  const h = route.indexOf('#');
+  const pg = h >= 0 ? route.slice(0, h) : route;
+  const hash = h >= 0 ? route.slice(h) : '';
+  return (at || base()) + pg + '?rl=' + (++state.loads) + hash;
+}
+
+function loadFrame(keepRoute) {
+  frame.src = frameUrl(keepRoute ? state.route : '');
+}
+
+document.getElementById('reset').onclick = () => loadFrame(false);
+
+function renderScreens() {
+  const sel = document.getElementById('screen');
+  if (!state.screens.length) {
+    sel.innerHTML = '<option>' + esc(state.route || 'no screens tagged') + '</option>';
+    sel.disabled = true;
+    return;
+  }
+  sel.disabled = false;
+  sel.innerHTML = state.screens.map(s =>
+    '<option value="' + esc(s.id) + '"' + (s.id === state.screen ? ' selected' : '') + '>'
+    + esc(s.title) + '</option>').join('');
+}
+
+document.getElementById('screen').onchange = e => post({type: 'goto', screen: e.target.value});
+
+window.addEventListener('message', e => {
+  if (e.source !== frame.contentWindow || !e.data || !e.data.__redline) return;
+  const m = e.data;
+  if (m.type === 'hello') {
+    post({type: 'init', base: base(), mode: state.mode, showResolved: state.showResolved,
+          pins: state.historySha ? [] : pinList()});
+    if (state.focusAfterLoad) {
+      const f = state.focusAfterLoad;
+      state.focusAfterLoad = null;
+      setTimeout(() => post({type: 'flash', id: f}), 250);
+    }
+  } else if (m.type === 'state') {
+    state.screens = m.screens || [];
+    state.screen = m.screen || '';
+    state.title = m.title || '';
+    state.route = m.route || '';
+    renderScreens();
+    document.getElementById('url').textContent = base() + state.route;
+    document.getElementById('newtab').href = base() + state.route;
+  } else if (m.type === 'pick') {
+    onPick(m);
+  } else if (m.type === 'shot') {
+    const done = state.shots.get(m.pid);
+    if (done) { state.shots.delete(m.pid); done(m.data); }
+  } else if (m.type === 'pinclick') {
+    rail.focusCard(m.id);
+  } else if (m.type === 'detached') {
+    state.detached = new Set(m.ids || []);
+    rail.render();
+  } else if (m.type === 'key') {
+    onKey(m.key);
+  } else if (m.type === 'dragging') {
+    state.dragging = !!m.on;
+  }
+});
+
+/* A drag that started in the prototype can leave the iframe; the shell then
+   sees the pointer, so it hands the position back in iframe coordinates. */
+function frameXY(e) {
+  const fr = frame.getBoundingClientRect();
+  const s = fr.width / (frame.offsetWidth || fr.width || 1);
+  return {x: (e.clientX - fr.left) / s, y: (e.clientY - fr.top) / s};
+}
+window.addEventListener('pointermove', e => {
+  if (state.dragging) post(Object.assign({type: 'dragmove'}, frameXY(e)));
+});
+window.addEventListener('pointerup', e => {
+  if (!state.dragging) return;
+  state.dragging = false;
+  post(Object.assign({type: 'dragend'}, frameXY(e)));
+});
+
+function toPage(r) {
+  const fr = frame.getBoundingClientRect();
+  const s = fr.width / (frame.offsetWidth || fr.width || 1);
+  return {left: fr.left + r.left * s + scrollX, right: fr.left + r.right * s + scrollX,
+          top: fr.top + r.top * s + scrollY, bottom: fr.top + r.bottom * s + scrollY};
+}
+
+function onPick(m) {
+  if (state.historySha || state.mode !== 'comment') { post({type: 'hold', on: false}); return; }
+  const a = m.anchor;
+  a.viewport = Object.assign({name: state.device}, a.viewport || {});
+  const title = a.title || a.screen || '';
+  const shot = new Promise(res => {
+    state.shots.set(m.pid, res);
+    setTimeout(() => { if (state.shots.delete(m.pid)) res(null); }, 6000);
+  });
+  rail.openForm('comment', {
+    label: m.text ? '“' + (m.text.length > 140 ? m.text.slice(0, 140) + '...' : m.text) + '”' : m.label,
+    where: (title ? title + ' · ' : '') + m.label,
+    editText: m.text,
+    allowEdit: m.editable,
+    rect: toPage(m.rect),
+    place: 'side',
+    extra: {kind: 'pin', anchor: a, section: title, quote: (m.text || m.label).slice(0, 300)},
+    onClose: () => post({type: 'hold', on: false}),
+  });
+  rail.attachImage(shot.then(data => data ? rail.uploadDataUrl(data) : null), true);
+}
+
+/* ---------- live data ---------- */
+
+function renderMeta(p) {
+  const meta = p.meta || {};
+  document.getElementById('title').textContent = meta.title || slug;
+  document.title = (meta.title || slug) + ' · Redline';
+  const vsel = document.getElementById('version');
+  vsel.querySelector('option[value="__live__"]').textContent = 'v' + (meta.version || '1') + ' (live)';
+  document.getElementById('pstatus').textContent = meta.status || 'draft';
+  const pl = document.getElementById('planlink');
+  pl.hidden = !meta.plan;
+  if (meta.plan) pl.href = '/plan/' + meta.plan;
+}
+
+async function refresh() {
+  if (state.historySha) return;
+  let p, fb;
+  try {
+    [p, fb] = await Promise.all([api('/api/proto/' + slug), api('/api/feedback/' + slug)]);
+  } catch (e) { setLive(false); return; }
+  setLive(true);
+  if (rail.busy()) return;
+  if (!state.proto) {
+    state.proto = p;
+    renderMeta(p);
+    setDevice(store.get('rl-device:' + slug) || p.meta.device || 'mobile');
+    rail.setFeedback(fb);
+    loadFrame(false);
+    return;
+  }
+  if (p.mtime !== state.proto.mtime) {
+    const oldV = state.proto.meta.version;
+    state.proto = p;
+    renderMeta(p);
+    loadFrame(true);
+    if (oldV !== p.meta.version) {
+      toast('Claude updated the prototype to v' + p.meta.version);
+      loadHistory();
+    }
+  }
+  if (rail.setFeedback(fb)) sendPins();
+}
+
+/* ---------- version history ---------- */
+
+async function loadHistory() {
+  let data;
+  try { data = await api('/api/history/' + slug); } catch (e) { return; }
+  state.history = data.commits || [];
+  const vsel = document.getElementById('version');
+  const keep = vsel.value;
+  vsel.querySelectorAll('option:not([value="__live__"])').forEach(o => o.remove());
+  for (const c of state.history) {
+    const opt = document.createElement('option');
+    opt.value = c.sha;
+    opt.textContent = (c.version ? 'v' + c.version : c.short) + ' · ' + c.date;
+    vsel.appendChild(opt);
+  }
+  vsel.value = keep && [...vsel.options].some(o => o.value === keep) ? keep : '__live__';
+}
+
+async function enterHistory(sha) {
+  let data;
+  try { data = await api('/api/history-at/' + sha + '/' + slug); }
+  catch (e) { toast('Could not load that version'); document.getElementById('version').value = '__live__'; return; }
+  if (rail.isFormOpen()) rail.closeForm();
+  setMode('interact');
+  state.historySha = sha;
+  rail.setDisabled(true);
+  document.querySelector('#modes [data-mode="comment"]').disabled = true;
+  const c = state.history.find(h => h.sha === sha);
+  document.getElementById('histbar').classList.add('on');
+  document.getElementById('histtext').textContent =
+    'Read only · ' + (data.meta.title || slug) + ' ' +
+    (c && c.version ? 'v' + c.version : (c ? c.short : sha.slice(0, 7))) +
+    (c ? ' · ' + c.date + ' · ' + c.subject : '');
+  document.getElementById('pstatus').textContent = data.meta.status || '';
+  layoutStage();
+  frame.src = frameUrl(state.route, base());
+}
+
+function exitHistory() {
+  state.historySha = null;
+  document.getElementById('histbar').classList.remove('on');
+  rail.setDisabled(false);
+  document.querySelector('#modes [data-mode="comment"]').disabled = false;
+  document.getElementById('version').value = '__live__';
+  if (state.proto) renderMeta(state.proto);
+  layoutStage();
+  loadFrame(true);
+}
+
+document.getElementById('version').addEventListener('change', e => {
+  if (e.target.value === '__live__') exitHistory();
+  else enterHistory(e.target.value);
+});
+document.getElementById('histback').onclick = exitHistory;
+
+document.getElementById('histrestore').onclick = async () => {
+  if (!state.historySha) return;
+  if (!confirm('Restore this version as the new latest? This adds it as a new version; nothing is lost.')) return;
+  try {
+    const r = await api('/api/restore/' + state.historySha + '/' + slug, {});
+    toast('Restored as v' + r.version);
+    exitHistory();
+    loadHistory();
+  } catch (e) { toast('Restore failed'); }
+};
+
+document.getElementById('download').onclick = () => {
+  window.location.href = state.historySha
+    ? '/raw-at/' + state.historySha + '/' + slug
+    : '/raw/' + slug;
+};
+
+/* ---------- boot ---------- */
+
+refresh().then(loadHistory);
+setInterval(refresh, 2500);
+</script>
+</body>
+</html>
