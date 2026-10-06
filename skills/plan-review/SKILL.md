@@ -9,7 +9,7 @@ Redline reviews two kinds of documents: **plans** (markdown, sections 1 to 6) an
 
 The user does not want long plans printed in the terminal. Plans are written as markdown files, served at http://127.0.0.1:4747 by Redline (the local plan server), reviewed in the browser, and revised through a feedback loop. Keep terminal output to a few lines; the plan lives in the browser.
 
-The server root is `~/.claude/plan-server` (the directory containing `server.py`; adjust every path below if it was cloned somewhere else). Use absolute paths when passing them to tools.
+Review data (`plans/`, `feedback/`, `inbox/`, `uploads/`) lives in `~/.claude/plan-server`, whether Redline was installed as a Claude Code plugin or cloned to that path. If it was cloned somewhere else, or `REDLINE_HOME` is set, `sh <this skill's base directory>/redline.sh data` prints the real location; adjust every path below to it. Use absolute paths when passing them to tools.
 
 ## 1. Write the plan
 
@@ -43,7 +43,7 @@ curl -sf http://127.0.0.1:4747/api/health >/dev/null 2>&1 \
   || echo "server down"
 ```
 
-If down, start it with Bash `run_in_background`: `python3 ~/.claude/plan-server/server.py`. Then open `http://127.0.0.1:4747/plan/<workspace>/<slug>` in the browser: `open <url>` on macOS, `xdg-open <url>` on Linux, `start <url>` on Windows. Always use `127.0.0.1`, never `localhost`. The server binds IPv4 only, and another dev server listening on the same port over IPv6 would answer `localhost` instead.
+If down, start it: `sh <this skill's base directory>/redline.sh start` (the base directory is printed when this skill loads; the server detaches and logs to `server.log` in the data directory, and the plugin's session hook usually has it running already). Then open `http://127.0.0.1:4747/plan/<workspace>/<slug>` in the browser: `open <url>` on macOS, `xdg-open <url>` on Linux, `start <url>` on Windows. Always use `127.0.0.1`, never `localhost`. The server binds IPv4 only, and another dev server listening on the same port over IPv6 would answer `localhost` instead.
 
 ## 3. Watch the inbox (your workspace only)
 
@@ -80,7 +80,7 @@ Never restart, re-plan, or drop in-flight work because feedback arrived.
   export const meta = { name: 'plan-feedback', description: 'Process plan review feedback batch', phases: [{ title: 'Process' }] }
   phase('Process')
   return await agent(`Process plan review feedback exactly per section 4 of
-  ~/.claude/plan-server/skill/SKILL.md. Slug: <slug>.
+  <absolute path of this SKILL.md>. Slug: <slug>.
   Plan: ~/.claude/plan-server/plans/<slug>.md (a prototype instead:
   ~/.claude/plan-server/plans/<slug>.proto/index.html, see section 7)
   Feedback: ~/.claude/plan-server/feedback/<slug>.json

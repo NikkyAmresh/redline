@@ -21,3 +21,6 @@ dist
 .dart_tool
 __pycache__
 *.log
+
+# runtime state of a server started with --daemon
+server.pid

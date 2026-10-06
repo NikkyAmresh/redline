@@ -29,14 +29,27 @@ Redline moves both into the browser and sends your feedback straight back to the
 - **Pins that survive edits.** Pins anchor to `data-rl` component ids, so they stay put when Claude changes the prototype; a pin whose component is gone is flagged as detached.
 - **Same loop as plans.** Send the batch, Claude edits the prototype, and it reloads on the same screen as the next version with your pins turned green. History, restore and download (`.html` or `.zip`) included.
 
-## Quick start
+## Install
+
+**As a Claude Code plugin** (recommended). In Claude Code:
+
+```
+/plugin marketplace add NikkyAmresh/redline
+/plugin install redline@redline
+```
+
+The plugin bundles the skill and starts the server when a session opens (a no-op if it is already running). Your plans and feedback live in `~/.claude/plan-server`, outside the plugin, so updates never touch them. Update with `/plugin update redline`.
+
+**From a git clone** (to hack on Redline itself):
 
 ```bash
 git clone https://github.com/NikkyAmresh/redline ~/.claude/plan-server
-git -C ~/.claude/plan-server config core.hooksPath hooks   # pre-push guard for local review data
-ln -s ../plan-server/skill ~/.claude/skills/plan-review
-python3 ~/.claude/plan-server/server.py                    # http://127.0.0.1:4747
+git -C ~/.claude/plan-server config core.hooksPath hooks       # pre-push guard for local review data
+ln -s ../plan-server/skills/plan-review ~/.claude/skills/plan-review
+sh ~/.claude/plan-server/skills/plan-review/redline.sh start    # http://127.0.0.1:4747
 ```
+
+Use one or the other, not both, or the skill loads twice. `redline.sh` also takes `stop`, `status` and `data`; `REDLINE_PORT` and `REDLINE_HOME` (the data directory) override the defaults.
 
 Then in any Claude Code session, ask for a plan or a prototype (or say `/plan-review`). Claude writes it, opens it in your browser and arms a watcher for your feedback.
 
@@ -74,7 +87,7 @@ Plans carry front matter (`title`, `version`, `status`, `updated`); prototypes c
 
 ## Prototype contract
 
-What Claude follows when it builds a prototype (full text in `skill/SKILL.md`, section 7):
+What Claude follows when it builds a prototype (full text in `skills/plan-review/SKILL.md`, section 7):
 
 - Screens are `[data-rl-screen]` sections with hash routes (`#/cart`, `#/product/3`, `#/cart?state=empty`).
 - Every element worth commenting on carries a stable `data-rl` id, on the group and on its parts. Ids never change between versions.
@@ -89,7 +102,9 @@ viewer.html      plan review page: rendering, selection toolbar, history
 prototype.html   prototype review page: device stage, Comment mode, pins
 static/          rail.js and redline.css (review rail shared by both pages),
                  bridge.js (injected into prototypes), kit.js (optional prototype helpers)
-skill/SKILL.md   the Claude Code skill driving the whole workflow
+skills/plan-review/   the Claude Code skill (SKILL.md) and redline.sh, the start/stop launcher
+.claude-plugin/  plugin and marketplace manifests
+hooks/           hooks.json (plugin: start the server on session start), pre-push (git guard)
 examples/demo/   the demo plan and prototype seeded on first start
 vendor/          marked, mermaid, html-to-image (all MIT)
 docs/            landing page (redline.algofunds.in, static assets on a Cloudflare Worker)

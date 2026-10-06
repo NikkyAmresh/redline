@@ -1,0 +1,15 @@
+{
+  "name": "redline",
+  "description": "Redline: a local review loop for Claude Code plans and prototypes.",
+  "owner": {
+    "name": "Nikky Amresh",
+    "url": "https://github.com/NikkyAmresh"
+  },
+  "plugins": [
+    {
+      "name": "redline",
+      "source": "./",
+      "description": "Review Claude Code plans like a doc and playable prototypes like a design, with feedback that lands back in the session."
+    }
+  ]
+}

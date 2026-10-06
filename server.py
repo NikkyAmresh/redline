@@ -25,11 +25,27 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import unquote
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
-PLANS_DIR = os.path.join(ROOT, "plans")
-FEEDBACK_DIR = os.path.join(ROOT, "feedback")
-INBOX_DIR = os.path.join(ROOT, "inbox")
+
+
+def _data_root():
+    """Where review data lives. A git clone keeps it next to the code (as
+    before). Installed as a Claude Code plugin, the code sits in a versioned
+    cache that updates replace, so the data goes to ~/.claude/plan-server,
+    the same place the skill expects. REDLINE_HOME overrides both."""
+    env = os.environ.get("REDLINE_HOME")
+    if env:
+        return os.path.abspath(os.path.expanduser(env))
+    if os.sep + os.path.join(".claude", "plugins") + os.sep in ROOT + os.sep:
+        return os.path.join(os.path.expanduser("~"), ".claude", "plan-server")
+    return ROOT
+
+
+DATA = _data_root()
+PLANS_DIR = os.path.join(DATA, "plans")
+FEEDBACK_DIR = os.path.join(DATA, "feedback")
+INBOX_DIR = os.path.join(DATA, "inbox")
+UPLOADS_DIR = os.path.join(DATA, "uploads")
 VENDOR_DIR = os.path.join(ROOT, "vendor")
-UPLOADS_DIR = os.path.join(ROOT, "uploads")
 STATIC_DIR = os.path.join(ROOT, "static")
 
 # A prototype is a folder <slug>.proto/ with index.html as its entry, living
@@ -1015,12 +1031,39 @@ class Handler(BaseHTTPRequestHandler):
         self.send_json({"error": "not found"}, 404)
 
 
+def daemonize():
+    """Detach into its own session (so a hook or shell exiting cannot take
+    the server down) and log to <data>/server.log. POSIX only."""
+    if os.fork() > 0:
+        os._exit(0)
+    os.setsid()
+    if os.fork() > 0:
+        os._exit(0)
+    log = open(os.path.join(DATA, "server.log"), "a")
+    os.dup2(log.fileno(), 1)
+    os.dup2(log.fileno(), 2)
+    devnull = os.open(os.devnull, os.O_RDONLY)
+    os.dup2(devnull, 0)
+    with open(os.path.join(DATA, "server.pid"), "w") as f:
+        f.write(str(os.getpid()))
+
+
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--port", type=int, default=4747)
+    ap.add_argument("--port", type=int, default=int(os.environ.get("REDLINE_PORT", 4747)))
+    ap.add_argument("--daemon", action="store_true",
+                    help="run in the background, logging to <data>/server.log")
+    ap.add_argument("--print-data", action="store_true",
+                    help="print the review data directory and exit")
     args = ap.parse_args()
+    if args.print_data:
+        print(DATA)
+        return
+    # bind before detaching, so a busy port fails loudly in the foreground
     srv = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
-    print("plan server on http://127.0.0.1:%d" % args.port, flush=True)
+    if args.daemon:
+        daemonize()
+    print("plan server on http://127.0.0.1:%d (data: %s)" % (args.port, DATA), flush=True)
     srv.serve_forever()
 
 

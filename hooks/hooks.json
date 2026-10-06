@@ -1,0 +1,16 @@
+{
+  "description": "Start the local Redline review server when a session opens; a no-op when it is already running.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/skills/plan-review/redline.sh\" start 2>/dev/null || true",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}
