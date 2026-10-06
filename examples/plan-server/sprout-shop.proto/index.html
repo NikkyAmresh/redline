@@ -145,6 +145,7 @@ svg { display:block; }
 .promo-msg.err { color:var(--red); }
 .sum div { display:flex; justify-content:space-between; padding:4px 0; }
 .sum .total { border-top:1px dashed var(--line); margin-top:6px; padding-top:10px; font-weight:750; font-size:17px; }
+.sum .gst { padding-top:0; font-size:12.5px; color:var(--muted); }
 .checkout { padding:12px 18px 16px; background:var(--card); border-top:1px solid var(--line); }
 
 /* ---------- done ---------- */
@@ -339,7 +340,8 @@ function totals() {
   const sub = Object.entries(S.cart).reduce((a, [id, q]) => a + byId(id).price * q, 0);
   const delivery = sub === 0 || sub >= 999 ? 0 : 79;
   const discount = S.promo ? Math.round(sub * 0.1) : 0;
-  return {sub, delivery, discount, total: sub + delivery - discount};
+  const total = sub + delivery - discount;
+  return {sub, delivery, discount, total, gst: Math.round(total * 18 / 118)};  // prices include 18% GST
 }
 function syncBadges() {
   const n = count();
@@ -419,10 +421,10 @@ Kit.screen('product', (el, params) => {
     + '<div class="stars" data-rl="product.rating">' + I.star + '<b>' + p.rating + '</b><span class="muted">'
     + p.reviews + ' reviews</span></div>'
     + '<div class="care" data-rl="product.care">'
-    + '<div>' + I.sun + '<b>Light</b><span>' + esc(p.light) + '</span></div>'
-    + '<div>' + I.drop + '<b>Water</b><span>' + esc(p.water) + '</span></div>'
-    + '<div>' + I.ruler + '<b>Size</b><span>' + esc(p.size) + '</span></div>'
-    + '<div>' + I.paw + '<b>Pets</b><span>' + (p.pet ? 'Safe' : 'Keep away') + '</span></div></div>'
+    + '<div data-rl="product.care-light">' + I.sun + '<b>Light</b><span>' + esc(p.light) + '</span></div>'
+    + '<div data-rl="product.care-water">' + I.drop + '<b>Water</b><span>' + esc(p.water) + '</span></div>'
+    + '<div data-rl="product.care-size">' + I.ruler + '<b>Size</b><span>' + esc(p.size) + '</span></div>'
+    + '<div data-rl="product.care-pets">' + I.paw + '<b>Pets</b><span>' + (p.pet ? 'Safe' : 'Keep away') + '</span></div></div>'
     + '<p class="desc" data-rl="product.description">' + esc(p.name) + ' arrives rooted in a breathable nursery pot, '
     + 'inside the ceramic pot shown. It settles in within a week; keep it out of harsh afternoon sun and let the top '
     + 'few centimetres of soil dry out between waterings.</p>';
@@ -497,10 +499,11 @@ Kit.screen('cart', el => {
     + '<div class="box" data-rl="cart.promo"><h4>Promo code</h4><div class="promo"><input id="promo" placeholder="Try SPROUT10" value="'
     + esc(S.promo || '') + '"><button id="apply" data-rl="cart.apply-promo">Apply</button></div>'
     + (S.promoMsg ? '<div class="promo-msg ' + S.promoMsg[0] + '">' + esc(S.promoMsg[1]) + '</div>' : '') + '</div>'
-    + '<div class="box sum" data-rl="cart.summary"><div><span class="muted">Subtotal</span><span>' + money(t.sub) + '</span></div>'
-    + '<div><span class="muted">Delivery</span><span>' + (t.delivery ? money(t.delivery) : 'Free') + '</span></div>'
-    + (t.discount ? '<div><span class="muted">SPROUT10</span><span style="color:var(--green)">-' + money(t.discount) + '</span></div>' : '')
-    + '<div class="total"><span>Total</span><span>' + money(t.total) + '</span></div></div>';
+    + '<div class="box sum" data-rl="cart.summary"><div data-rl="cart.subtotal"><span class="muted">Subtotal</span><span>' + money(t.sub) + '</span></div>'
+    + '<div data-rl="cart.delivery-fee"><span class="muted">Delivery</span><span>' + (t.delivery ? money(t.delivery) : 'Free') + '</span></div>'
+    + (t.discount ? '<div data-rl="cart.discount"><span class="muted">SPROUT10</span><span style="color:var(--green)">-' + money(t.discount) + '</span></div>' : '')
+    + '<div class="total" data-rl="cart.total"><span>Total <small class="muted" style="font-weight:500;font-size:12px">incl. GST</small></span><span>' + money(t.total) + '</span></div>'
+    + '<div class="gst" data-rl="cart.gst"><span>Includes GST (18%)</span><span>' + money(t.gst) + '</span></div></div>';
   bar.innerHTML = '<div class="checkout"><button class="btn" data-rl="cart.checkout-button" id="place">'
     + (S.placing ? '<span class="spin"></span>Placing order' : 'Place order, ' + money(t.total)) + '</button></div>';
   document.getElementById('place').disabled = S.placing;
@@ -535,10 +538,10 @@ Kit.screen('done', el => {
   const o = S.order || {id: 'SPR-41872', items: 2, total: 1748, slot: SLOTS[0]};
   el.innerHTML = '<div class="done" data-rl="done.confirmation"><div class="tick">' + I.check + '</div>'
     + '<div class="h1">Order placed</div><p class="muted" style="margin-top:6px">Your plants are being packed with care.</p></div>'
-    + '<div class="box receipt" data-rl="done.receipt"><div><span class="muted">Order</span><b>' + o.id + '</b></div>'
-    + '<div><span class="muted">Arriving</span><b>' + o.slot[0] + ', ' + o.slot[1] + '</b></div>'
-    + '<div><span class="muted">Items</span><b>' + o.items + '</b></div>'
-    + '<div><span class="muted">Paid</span><b>' + money(o.total) + '</b></div></div>'
+    + '<div class="box receipt" data-rl="done.receipt"><div data-rl="done.order-id"><span class="muted">Order</span><b>' + o.id + '</b></div>'
+    + '<div data-rl="done.arriving"><span class="muted">Arriving</span><b>' + o.slot[0] + ', ' + o.slot[1] + '</b></div>'
+    + '<div data-rl="done.items"><span class="muted">Items</span><b>' + o.items + '</b></div>'
+    + '<div data-rl="done.paid"><span class="muted">Paid, incl. GST</span><b>' + money(o.total) + '</b></div></div>'
     + '<button class="btn" data-rl="done.track" id="track">Track order</button>'
     + '<button class="btn ghost" style="margin-top:10px" data-go="home" data-rl="done.back-to-shop">Back to shop</button>';
   document.getElementById('track').onclick = () => Kit.modal({
