@@ -34,31 +34,46 @@ Redline moves both into the browser and sends your feedback straight back to the
 **As a Claude Code plugin** (recommended). In Claude Code:
 
 ```
-/plugin marketplace add NikkyAmresh/redline
-/plugin install redline@redline
+/plugin marketplace add NikkyAmresh/claude-plugins
+/plugin install redline@nikkyamresh
 ```
 
-The plugin bundles the skill and starts the server when a session opens (a no-op if it is already running). Your plans and feedback live in `~/.claude/plan-server`, outside the plugin, so updates never touch them. Update with `/plugin update redline`.
+Redline is listed in [NikkyAmresh/claude-plugins](https://github.com/NikkyAmresh/claude-plugins), a marketplace for all of its author's Claude Code plugins. The plugin bundles the skill and starts the server when a session opens (reusing it if it is already running). Your plans and feedback live in `~/.claude/redline`, outside the plugin, so updates never touch them. Update with `/plugin update redline`.
 
 **From a git clone** (to hack on Redline itself):
 
 ```bash
-git clone https://github.com/NikkyAmresh/redline ~/.claude/plan-server
-git -C ~/.claude/plan-server config core.hooksPath hooks       # pre-push guard for local review data
-ln -s ../plan-server/skills/plan-review ~/.claude/skills/plan-review
-sh ~/.claude/plan-server/skills/plan-review/redline.sh start    # http://127.0.0.1:4747
+git clone https://github.com/NikkyAmresh/redline ~/.claude/redline
+git -C ~/.claude/redline config core.hooksPath hooks     # pre-push guard for local review data
+ln -s ../redline/skills/redline ~/.claude/skills/redline
+sh ~/.claude/redline/skills/redline/redline.sh start      # prints the URL
 ```
 
-Use one or the other, not both, or the skill loads twice. `redline.sh` also takes `stop`, `status` and `data`; `REDLINE_PORT` and `REDLINE_HOME` (the data directory) override the defaults.
+Use one or the other, not both, or the skill loads twice.
 
-Then in any Claude Code session, ask for a plan or a prototype (or say `/plan-review`). Claude writes it, opens it in your browser and arms a watcher for your feedback.
+Then in any Claude Code session, ask for a plan or a prototype (or say `/redline`). Claude writes it, opens it in your browser and arms a watcher for your feedback.
 
-Two demos are seeded on first start, and they link to each other:
+Two demos are seeded on first start, and they link to each other (the address is usually `http://127.0.0.1:4747`; see below):
 
-- `http://127.0.0.1:4747/plan/demo/delivery-slots`: a plan for a fictional plant shop. Select a sentence and try it.
-- `http://127.0.0.1:4747/proto/demo/sprout-shop`: the playable app that plan describes. Press `C` and click anything.
+- `/plan/demo/delivery-slots`: a plan for a fictional plant shop. Select a sentence and try it.
+- `/proto/demo/sprout-shop`: the playable app that plan describes. Press `C` and click anything.
 
-Use `127.0.0.1` rather than `localhost`: the server binds IPv4 only, so another dev server on the same port over IPv6 would answer `localhost` instead.
+## One server, a known address
+
+There is only ever one Redline per data directory, and every way of starting it is safe to repeat:
+
+```bash
+sh skills/redline/redline.sh start    # start in the background, or report the running one
+sh skills/redline/redline.sh url      # print the URL (starting it if needed)
+sh skills/redline/redline.sh status   # running or not, and where
+sh skills/redline/redline.sh stop
+sh skills/redline/redline.sh data     # the data directory
+```
+
+- **Identity.** `GET /api/health` answers `{"app": "redline", "version", "pid", "port", "url", "data", ...}`, so nothing mistakes another app on the port for Redline.
+- **Single instance.** The running server holds a lock on `<data>/server.lock` for its whole life and records itself in `<data>/server.json`. A crashed server releases the lock, so a stale record never blocks a restart. Two sessions starting at once still end up with one server.
+- **Port.** `REDLINE_PORT` if set, else the last port it used (so open tabs keep working), else 4747; if that is taken, the next free one up to 4767. A port counts as taken if anything answers on it over IPv4 or IPv6. Redline listens on `127.0.0.1` and `::1`, so `localhost` and `127.0.0.1` reach the same server.
+- **Discovery.** Agents run `redline.sh url`; the plugin's session hook also prints "Redline is running at ..." into each session. `REDLINE_HOME` moves the data directory.
 
 Requirements: Python 3.7+ and Claude Code. macOS and Linux are supported; the skill's shell snippets are POSIX.
 
@@ -87,7 +102,7 @@ Plans carry front matter (`title`, `version`, `status`, `updated`); prototypes c
 
 ## Prototype contract
 
-What Claude follows when it builds a prototype (full text in `skills/plan-review/SKILL.md`, section 7):
+What Claude follows when it builds a prototype (full text in `skills/redline/SKILL.md`, section 7):
 
 - Screens are `[data-rl-screen]` sections with hash routes (`#/cart`, `#/product/3`, `#/cart?state=empty`).
 - Every element worth commenting on carries a stable `data-rl` id, on the group and on its parts. Ids never change between versions.
@@ -102,8 +117,8 @@ viewer.html      plan review page: rendering, selection toolbar, history
 prototype.html   prototype review page: device stage, Comment mode, pins
 static/          rail.js and redline.css (review rail shared by both pages),
                  bridge.js (injected into prototypes), kit.js (optional prototype helpers)
-skills/plan-review/   the Claude Code skill (SKILL.md) and redline.sh, the start/stop launcher
-.claude-plugin/  plugin and marketplace manifests
+skills/redline/  the Claude Code skill (SKILL.md) and redline.sh, the launcher
+.claude-plugin/  plugin manifest (listed in the NikkyAmresh/claude-plugins marketplace)
 hooks/           hooks.json (plugin: start the server on session start), pre-push (git guard)
 examples/demo/   the demo plan and prototype seeded on first start
 vendor/          marked, mermaid, html-to-image (all MIT)
@@ -128,7 +143,7 @@ GET  /plan/<slug>                   plan review page
 GET  /proto/<slug>                  prototype review page
 GET  /p/<slug>/<path>               prototype files (sandboxed, bridge injected)
 GET  /p-at/<sha>/<slug>/<path>      prototype files as of a commit
-GET  /api/health
+GET  /api/health                     identity: {app: "redline", version, pid, port, url, data}
 GET  /api/plan/<slug>               {slug, meta, markdown, mtime}
 GET  /api/proto/<slug>              {slug, kind, meta, mtime}
 GET  /api/feedback/<slug>           {items: [...]}

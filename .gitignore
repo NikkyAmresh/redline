@@ -24,3 +24,5 @@ __pycache__
 
 # runtime state of a server started with --daemon
 server.pid
+server.json
+server.lock

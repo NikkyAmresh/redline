@@ -284,8 +284,8 @@ footer a:hover { color:var(--accent); }
     <span class="ghost">MIT · Python stdlib · works offline</span>
   </div>
 
-  <pre class="code"><span class="p">&gt;</span> /plugin marketplace add NikkyAmresh/redline
-<span class="p">&gt;</span> /plugin install redline@redline   <span class="c"># serves 127.0.0.1:4747 from each session</span></pre>
+  <pre class="code"><span class="p">&gt;</span> /plugin marketplace add NikkyAmresh/claude-plugins
+<span class="p">&gt;</span> /plugin install redline@nikkyamresh   <span class="c"># starts with each session</span></pre>
 </main>
 
 <div class="wide shot">
@@ -382,20 +382,20 @@ footer a:hover { color:var(--accent); }
   <section>
     <div class="eyebrow">Local by design</div>
     <h2>Your plans never leave your machine.</h2>
-    <p>The server binds <b>127.0.0.1</b>, rejects foreign Host headers, and never phones home. Plans, feedback, and screenshots live in <b>~/.claude/plan-server</b> as plain files. There is no auth because there is no network: it is a single-reviewer tool on purpose. Don't put it on the internet.</p>
+    <p>The server binds <b>127.0.0.1</b>, rejects foreign Host headers, and never phones home. Plans, feedback, and screenshots live in <b>~/.claude/redline</b> as plain files. There is no auth because there is no network: it is a single-reviewer tool on purpose. Don't put it on the internet.</p>
   </section>
 
   <section>
     <div class="eyebrow">Quick start</div>
     <h2>Two commands in Claude Code, then ask for a plan.</h2>
-    <pre class="code"><span class="p">&gt;</span> /plugin marketplace add NikkyAmresh/redline
-<span class="p">&gt;</span> /plugin install redline@redline   <span class="c"># serves 127.0.0.1:4747 from each session</span></pre>
-    <p style="margin-top:16px">The plugin bundles the skill and starts the server with each session. Your plans and feedback live in <b>~/.claude/plan-server</b>, outside the plugin, so updates never touch them. Python 3.7+ and Claude Code, on macOS or Linux.</p>
+    <pre class="code"><span class="p">&gt;</span> /plugin marketplace add NikkyAmresh/claude-plugins
+<span class="p">&gt;</span> /plugin install redline@nikkyamresh   <span class="c"># starts with each session</span></pre>
+    <p style="margin-top:16px">The plugin bundles the skill and starts the server with each session. Your plans and feedback live in <b>~/.claude/redline</b>, outside the plugin, so updates never touch them. Python 3.7+ and Claude Code, on macOS or Linux.</p>
     <p style="margin-top:12px">Want to hack on Redline itself? Clone it instead (use one or the other):</p>
-    <pre class="code"><span class="p">$</span> git clone https://github.com/NikkyAmresh/redline ~/.claude/plan-server
-<span class="p">$</span> ln -s ../plan-server/skills/plan-review ~/.claude/skills/plan-review
-<span class="p">$</span> sh ~/.claude/plan-server/skills/plan-review/redline.sh start</pre>
-    <p style="margin-top:16px">Then ask any session for a plan or a prototype, or say <b>/plan-review</b>. Two demos ship with it, a plan and the playable app it describes: select a sentence, or press C and click a component, and send Claude a note.</p>
+    <pre class="code"><span class="p">$</span> git clone https://github.com/NikkyAmresh/redline ~/.claude/redline
+<span class="p">$</span> ln -s ../redline/skills/redline ~/.claude/skills/redline
+<span class="p">$</span> sh ~/.claude/redline/skills/redline/redline.sh start</pre>
+    <p style="margin-top:16px">Then ask any session for a plan or a prototype, or say <b>/redline</b>. Two demos ship with it, a plan and the playable app it describes: select a sentence, or press C and click a component, and send Claude a note.</p>
     <div class="cta">
       <a class="btn" href="https://github.com/NikkyAmresh/redline">View on GitHub</a>
     </div>

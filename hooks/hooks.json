@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/skills/plan-review/redline.sh\" start 2>/dev/null || true",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/skills/redline/redline.sh\" start 2>/dev/null || true",
             "timeout": 15
           }
         ]

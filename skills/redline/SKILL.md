@@ -1,19 +1,21 @@
 ---
-name: plan-review
-description: Present implementation plans as HTML pages on the local Redline plan server instead of long terminal output, and build playable prototypes (clickable dummy apps or websites) the user reviews by pinning comments to components. Use whenever the user asks for a project or feature plan, design doc, phased roadmap, or architecture proposal; when they ask for a prototype, clickable mockup, dummy app, playable demo or interactive mock of any app or website; when they say /plan-review; or when plan or prototype feedback needs processing. Serves mermaid diagrams, collects inline comments, suggested edits and component pins in the browser, and routes submitted feedback back into the session.
+name: redline
+description: Redline, the planning and review loop. Present implementation plans as HTML pages on the local Redline server instead of long terminal output, and build playable prototypes (clickable dummy apps or websites) the user reviews by pinning comments to components. Use whenever the user asks for a project or feature plan, design doc, phased roadmap, or architecture proposal; when they ask for a prototype, clickable mockup, dummy app, playable demo or interactive mock of any app or website; when they say /redline or /plan-review; or when plan or prototype feedback needs processing. Serves mermaid diagrams, collects inline comments, suggested edits and component pins in the browser, and routes submitted feedback back into the session.
 ---
 
 # Redline: the plan and prototype review workflow
 
 Redline reviews two kinds of documents: **plans** (markdown, sections 1 to 6) and **prototypes** (playable HTML dummies of an app or website, section 7). Both share the inbox, feedback files, version history and the review rail.
 
-The user does not want long plans printed in the terminal. Plans are written as markdown files, served at http://127.0.0.1:4747 by Redline (the local plan server), reviewed in the browser, and revised through a feedback loop. Keep terminal output to a few lines; the plan lives in the browser.
+The user does not want long plans printed in the terminal. Plans are written as markdown files, served by Redline (a local server), reviewed in the browser, and revised through a feedback loop. Keep terminal output to a few lines; the plan lives in the browser.
 
-Review data (`plans/`, `feedback/`, `inbox/`, `uploads/`) lives in `~/.claude/plan-server`, whether Redline was installed as a Claude Code plugin or cloned to that path. If it was cloned somewhere else, or `REDLINE_HOME` is set, `sh <this skill's base directory>/redline.sh data` prints the real location; adjust every path below to it. Use absolute paths when passing them to tools.
+Review data (`plans/`, `feedback/`, `inbox/`, `uploads/`) lives in `~/.claude/redline`, whether Redline was installed as a Claude Code plugin or cloned to that path. If it was cloned somewhere else, or `REDLINE_HOME` is set, `sh <this skill's base directory>/redline.sh data` prints the real location; adjust every path below to it. Use absolute paths when passing them to tools.
+
+**`<redline>` below means the server's URL.** Never assume a port: there is exactly one Redline per data directory, and it moves to the next free port (4747 upward) when its usual one is taken. Get the URL with `sh <this skill's base directory>/redline.sh url` (it starts the server in the background if it is not running, and reuses it if it is); the plugin's session hook also prints "Redline is running at ..." into the session context. `GET <redline>/api/health` answers with `"app": "redline"`, which is how anything can tell Redline apart from another app on the port.
 
 ## 1. Write the plan
 
-Create `~/.claude/plan-server/plans/<workspace>/<slug>.md` (both lowercase, hyphens). `<workspace>` is the project the plan belongs to, normally the kebab-cased basename of the repo or working directory (e.g. `my-app`, `plan-server`). Every plan goes in a workspace folder; never write directly into `plans/`. The index page groups plans by workspace. Required front matter:
+Create `~/.claude/redline/plans/<workspace>/<slug>.md` (both lowercase, hyphens). `<workspace>` is the project the plan belongs to, normally the kebab-cased basename of the repo or working directory (e.g. `my-app`, `redline`). Every plan goes in a workspace folder; never write directly into `plans/`. The index page groups plans by workspace. Required front matter:
 
 ```
 ---
@@ -29,21 +31,20 @@ Content guidelines:
 - Phase sections with `- [ ]` task checklists, a components table, and a risks or open questions section.
 - Follow any writing style preferences the user has expressed.
 
-`plans/` is its own local-only git repo (root at `~/.claude/plan-server/plans`, created by the server on first start). It is separate from the Redline repo and gitignored there; plans, feedback, inbox and uploads must never be added to or pushed from `~/.claude/plan-server`. After writing the file, commit it in the plans repo so v1 is a retrievable point in history, not just a number in the front matter:
+`plans/` is its own local-only git repo (root at `~/.claude/redline/plans`, created by the server on first start). It is separate from the Redline repo and gitignored there; plans, feedback, inbox and uploads must never be added to or pushed from `~/.claude/redline`. After writing the file, commit it in the plans repo so v1 is a retrievable point in history, not just a number in the front matter:
 
 ```
-git -C ~/.claude/plan-server/plans add <workspace>/<slug>.md
-git -C ~/.claude/plan-server/plans commit -m "<workspace>/<slug>: v1"
+git -C ~/.claude/redline/plans add <workspace>/<slug>.md
+git -C ~/.claude/redline/plans commit -m "<workspace>/<slug>: v1"
 ```
 
 ## 2. Serve and open
 
 ```
-curl -sf http://127.0.0.1:4747/api/health >/dev/null 2>&1 \
-  || echo "server down"
+sh <this skill's base directory>/redline.sh url
 ```
 
-If down, start it: `sh <this skill's base directory>/redline.sh start` (the base directory is printed when this skill loads; the server detaches and logs to `server.log` in the data directory, and the plugin's session hook usually has it running already). Then open `http://127.0.0.1:4747/plan/<workspace>/<slug>` in the browser: `open <url>` on macOS, `xdg-open <url>` on Linux, `start <url>` on Windows. Always use `127.0.0.1`, never `localhost`. The server binds IPv4 only, and another dev server listening on the same port over IPv6 would answer `localhost` instead.
+This prints `<redline>`, starting the server if needed and reusing it if it is already running (never start a second one; `redline.sh start` and `url` are both safe to repeat). The base directory is printed when this skill loads. Then open `<redline>/plan/<workspace>/<slug>` in the browser: `open <url>` on macOS, `xdg-open <url>` on Linux, `start <url>` on Windows. `localhost` and `127.0.0.1` both reach it.
 
 ## 3. Watch the inbox (your workspace only)
 
@@ -51,7 +52,7 @@ Arm a persistent watcher, one per session. **Scope it to your own workspace.** S
 
 ```
 while true; do
-  for f in $(find ~/.claude/plan-server/inbox -maxdepth 1 -name '<workspace>__*.json' 2>/dev/null); do
+  for f in $(find ~/.claude/redline/inbox -maxdepth 1 -name '<workspace>__*.json' 2>/dev/null); do
     echo "FEEDBACK $(basename "$f" .json) $(cat "$f")"
     mv "$f" "$f.claimed"
   done
@@ -81,24 +82,24 @@ Never restart, re-plan, or drop in-flight work because feedback arrived.
   phase('Process')
   return await agent(`Process plan review feedback exactly per section 4 of
   <absolute path of this SKILL.md>. Slug: <slug>.
-  Plan: ~/.claude/plan-server/plans/<slug>.md (a prototype instead:
-  ~/.claude/plan-server/plans/<slug>.proto/index.html, see section 7)
-  Feedback: ~/.claude/plan-server/feedback/<slug>.json
+  Plan: ~/.claude/redline/plans/<slug>.md (a prototype instead:
+  ~/.claude/redline/plans/<slug>.proto/index.html, see section 7)
+  Feedback: ~/.claude/redline/feedback/<slug>.json
   Claimed inbox file to delete when done: <path>
   Read attached images, apply edits, resolve or answer every submitted item
   (resolution summaries or thread entries plus answered status), bump version
   and updated, then commit in the nested plans repo
-  (git -C ~/.claude/plan-server/plans add/commit, see step 4).
+  (git -C ~/.claude/redline/plans add/commit, see step 4).
   Return a one-line summary of what changed.`)
   ```
 
   Use a pipeline over items instead of the single agent only when the batch is large. If there is no Workflow tool, spawn a background subagent with the Agent tool using the same prompt. If neither exists, fall back to processing inline. A background run continues while you work on your own task; when its notification arrives, relay the one-line outcome. Do not wait for it, poll it, or open the feedback file yourself.
 - `"inline"` or missing: process it in this session, subject to the triage rule above.
 
-Read the claimed inbox file to get the slug, then read `~/.claude/plan-server/feedback/<workspace>/<slug>.json`. The inbox JSON's `kind` is `plan` or `prototype`; for a prototype, also follow the pin rules in section 7. For every item with `"status": "submitted"`:
+Read the claimed inbox file to get the slug, then read `~/.claude/redline/feedback/<workspace>/<slug>.json`. The inbox JSON's `kind` is `plan` or `prototype`; for a prototype, also follow the pin rules in section 7. For every item with `"status": "submitted"`:
 
 - Items carry: `type` (comment or edit), `quote` (the selected text as rendered, so markdown syntax like `**` or backticks is stripped), `section` (nearest heading), `prefix`/`suffix` (surrounding rendered text), `comment`, for edits `suggested_text`, and possibly a `thread` array of `{who, text, at}` messages if the item has been discussed before (`who` is `user` or `claude`).
-- Items and thread messages may carry `images`: screenshots the user attached, as `/uploads/<file>` paths that map to `~/.claude/plan-server/uploads/<file>`. Always Read those files; they are usually the core of the feedback, not decoration.
+- Items and thread messages may carry `images`: screenshots the user attached, as `/uploads/<file>` paths that map to `~/.claude/redline/uploads/<file>`. Always Read those files; they are usually the core of the feedback, not decoration.
 - Locate the passage in the markdown source using section plus quote; match loosely since rendered text differs from source.
 - `edit` items: apply `suggested_text` to the source, adapting markdown syntax as needed. Use judgment; if the suggestion is wrong or conflicts with another item, deviate and explain when closing the item.
 - `comment` items: revise the plan to address it, or answer the question.
@@ -106,7 +107,7 @@ Read the claimed inbox file to get the slug, then read `~/.claude/plan-server/fe
   - Fully handled: set `"status": "resolved"` and write `"resolution"`: a 1-2 line summary of what was decided or changed. Delete the item's `"thread"` and legacy `"reply"` fields; resolved cards show only the summary, never the trail. The server also compacts resolved items automatically on load (drops comment, thread, prefix and suffix), so feedback files stay small; never re-read or reason over resolved items when processing new feedback, only items with `"status": "submitted"` matter.
   - Needs the user's answer (open question, a choice between options, an unclear ask): append `{"who": "claude", "text": "...", "at": <epoch seconds>}` to the item's `"thread"` array and set `"status": "answered"`. The page shows these in red under "Needs your reply" and the index flags the plan. When the user replies in the browser, the item flips back to `"submitted"` and a new inbox file appears, so the watcher loop picks the conversation up again.
 - Bump `version` and `updated` in the plan front matter. The browser polls every 2.5s and shows the new version plus replies automatically.
-- Commit the bump in the nested plans repo: `git -C ~/.claude/plan-server/plans add <workspace>/<slug>.md && git -C ~/.claude/plan-server/plans commit -m "<workspace>/<slug>: v<N> - <what changed>"` (a prototype: `add <workspace>/<slug>.proto`). This is what makes the previous version recoverable; skipping it silently loses v<N-1>. Never run these against `~/.claude/plan-server` itself: `plans/` is ignored there, so the add fails and the version is lost.
+- Commit the bump in the nested plans repo: `git -C ~/.claude/redline/plans add <workspace>/<slug>.md && git -C ~/.claude/redline/plans commit -m "<workspace>/<slug>: v<N> - <what changed>"` (a prototype: `add <workspace>/<slug>.proto`). This is what makes the previous version recoverable; skipping it silently loses v<N-1>. Never run these against `~/.claude/redline` itself: `plans/` is ignored there, so the add fails and the version is lost.
 - Delete the processed `inbox/<workspace>__<slug>.json.claimed` file.
 - Tell the user in one or two lines what changed; do not restate the plan in the terminal.
 
@@ -121,9 +122,9 @@ The page itself has a version dropdown in the header (next to the title): switch
 For your own lookups, every bump is a commit, so history is plain git on the nested plans repo:
 
 ```
-git -C ~/.claude/plan-server/plans log --oneline -- <workspace>/<slug>.md
-git -C ~/.claude/plan-server/plans show <sha>:<workspace>/<slug>.md
-git -C ~/.claude/plan-server/plans diff <sha1> <sha2> -- <workspace>/<slug>.md
+git -C ~/.claude/redline/plans log --oneline -- <workspace>/<slug>.md
+git -C ~/.claude/redline/plans show <sha>:<workspace>/<slug>.md
+git -C ~/.claude/redline/plans diff <sha1> <sha2> -- <workspace>/<slug>.md
 ```
 
 For a prototype use the folder path `<workspace>/<slug>.proto` (and `<workspace>/<slug>.proto/index.html` with `show`).
@@ -136,7 +137,7 @@ When the user asks for a prototype, clickable mockup, dummy app or playable demo
 
 ### Layout and front matter
 
-A prototype is a folder next to the plans: `~/.claude/plan-server/plans/<workspace>/<slug>.proto/` with `index.html` as the entry and optional `assets/`. Pick a slug that no plan in the workspace uses. Front matter is the usual block wrapped in the first HTML comment of `index.html`; the server strips it before serving:
+A prototype is a folder next to the plans: `~/.claude/redline/plans/<workspace>/<slug>.proto/` with `index.html` as the entry and optional `assets/`. Pick a slug that no plan in the workspace uses. Front matter is the usual block wrapped in the first HTML comment of `index.html`; the server strips it before serving:
 
 ```html
 <!--
@@ -152,7 +153,7 @@ plan: <workspace>/<plan-slug>
 <!doctype html>
 ```
 
-`device` (mobile, tablet or desktop) picks the default frame. `plan` links the prototype to a plan; a plan links back with `prototype: <workspace>/<slug>` in its own front matter. Commit v1 in the plans repo (`git -C ~/.claude/plan-server/plans add <workspace>/<slug>.proto`, then commit `<workspace>/<slug>: v1`), then open `http://127.0.0.1:4747/proto/<workspace>/<slug>` and arm the inbox watcher exactly as for plans.
+`device` (mobile, tablet or desktop) picks the default frame. `plan` links the prototype to a plan; a plan links back with `prototype: <workspace>/<slug>` in its own front matter. Commit v1 in the plans repo (`git -C ~/.claude/redline/plans add <workspace>/<slug>.proto`, then commit `<workspace>/<slug>: v1`), then open `<redline>/proto/<workspace>/<slug>` and arm the inbox watcher exactly as for plans.
 
 ### The contract
 
@@ -177,6 +178,6 @@ Same loop as section 4, with these differences:
 - Items with `"kind": "pin"` carry an `anchor`: `screen`, `title`, `route`, `component` (the `data-rl` id), `selector`, `tag`, `text`, `offset` (where on the element they clicked, as fractions), `box` (for an area pin, the area as fractions of the anchored element), and `viewport`. `section` is the screen title and `quote` the element's text. `"kind": "screen"` items are notes about a whole screen.
 - Find the element by `component` first (grep `data-rl="<id>"` in `index.html`), then by `selector` and `text`. Always open the attached screenshots; they show the state the user saw (an open sheet, a filled form) that the source alone does not.
 - `edit` items are copy changes: `quote` is the current text, `suggested_text` the replacement.
-- Keep every `data-rl` id stable. Bump `version` and `updated` in the front matter comment, then commit the folder: `git -C ~/.claude/plan-server/plans add <workspace>/<slug>.proto && git -C ~/.claude/plan-server/plans commit -m "<workspace>/<slug>: v<N> - <what changed>"`.
-- When a change is visual and a browser tool is available, check the touched screen at `http://127.0.0.1:4747/p/<workspace>/<slug>/#/<screen>` before resolving.
+- Keep every `data-rl` id stable. Bump `version` and `updated` in the front matter comment, then commit the folder: `git -C ~/.claude/redline/plans add <workspace>/<slug>.proto && git -C ~/.claude/redline/plans commit -m "<workspace>/<slug>: v<N> - <what changed>"`.
+- When a change is visual and a browser tool is available, check the touched screen at `<redline>/p/<workspace>/<slug>/#/<screen>` before resolving.
 - The page reloads the prototype on the same screen when files change, toasts the new version, and shows resolved pins in green.

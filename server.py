@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Local plan review server.
+"""Redline: a local review server for Claude Code plans and prototypes.
 
-Serves plan markdown files as reviewable HTML pages, collects inline
-comments and suggested edits from the browser, and drops a signal file
-in inbox/ when the user submits a batch so Claude can pick it up.
+Serves plans (markdown) and prototypes (HTML) as reviewable pages, collects
+comments, suggested edits and component pins from the browser, and drops a
+signal file in inbox/ when the user submits a batch so Claude can pick it up.
 
-Stdlib only. Run: python3 server.py [--port 4747]
+One server per data directory: starting it again only reports the running
+one. Stdlib only. Run: python3 server.py [--daemon | --url | --status | --stop]
 """
 import argparse
 import base64
@@ -20,27 +21,77 @@ import subprocess
 import sys
 import threading
 import time
+import signal
+import socket
+import urllib.request
 import zipfile
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import unquote
 
+try:
+    import fcntl
+except ImportError:  # Windows: no single-instance lock, everything else works
+    fcntl = None
+
+APP = "redline"
+VERSION = "1.1.0"
+DEFAULT_PORT = 4747
+PORT_SPAN = 20  # try DEFAULT_PORT..DEFAULT_PORT+20 when a port is taken
+
 ROOT = os.path.dirname(os.path.abspath(__file__))
+HOME_DIR = os.path.join(os.path.expanduser("~"), ".claude", "redline")
+LEGACY_HOME = os.path.join(os.path.expanduser("~"), ".claude", "plan-server")
 
 
 def _data_root():
-    """Where review data lives. A git clone keeps it next to the code (as
-    before). Installed as a Claude Code plugin, the code sits in a versioned
-    cache that updates replace, so the data goes to ~/.claude/plan-server,
-    the same place the skill expects. REDLINE_HOME overrides both."""
+    """Where review data lives. A git clone keeps it next to the code.
+    Installed as a Claude Code plugin, the code sits in a versioned cache
+    that updates replace, so the data goes to ~/.claude/redline instead.
+    REDLINE_HOME overrides both."""
     env = os.environ.get("REDLINE_HOME")
     if env:
         return os.path.abspath(os.path.expanduser(env))
     if os.sep + os.path.join(".claude", "plugins") + os.sep in ROOT + os.sep:
-        return os.path.join(os.path.expanduser("~"), ".claude", "plan-server")
+        return HOME_DIR
     return ROOT
 
 
 DATA = _data_root()
+
+
+def _migrate_legacy_home():
+    """Plugin 1.0 kept its data in ~/.claude/plan-server. Move it to the
+    new home once and leave a symlink, so old paths keep working. A git
+    clone living at the old path is left alone; its owner moves it."""
+    if DATA != HOME_DIR or not os.path.isdir(os.path.join(LEGACY_HOME, "plans")):
+        return
+    if os.path.realpath(LEGACY_HOME) == os.path.realpath(DATA):
+        return
+    if os.path.exists(os.path.join(LEGACY_HOME, "server.py")):
+        return
+    if os.path.exists(os.path.join(DATA, "plans")):
+        return
+    os.makedirs(DATA, exist_ok=True)
+    for name in ("plans", "feedback", "inbox", "uploads"):
+        src = os.path.join(LEGACY_HOME, name)
+        if os.path.exists(src):
+            os.rename(src, os.path.join(DATA, name))
+    for leftover in ("server.log", "server.pid"):
+        try:
+            os.remove(os.path.join(LEGACY_HOME, leftover))
+        except OSError:
+            pass
+    try:
+        os.rmdir(LEGACY_HOME)
+        os.symlink(DATA, LEGACY_HOME)
+    except OSError:
+        pass
+
+
+_migrate_legacy_home()
+RUNTIME_FILE = os.path.join(DATA, "server.json")
+LOCK_FILE = os.path.join(DATA, "server.lock")
+SERVER_INFO = {}  # port, url and start time of the running server
 PLANS_DIR = os.path.join(DATA, "plans")
 FEEDBACK_DIR = os.path.join(DATA, "feedback")
 INBOX_DIR = os.path.join(DATA, "inbox")
@@ -497,7 +548,7 @@ h2.ws {{ font:13px ui-monospace, Menlo, monospace; text-transform:uppercase;
 .kind svg {{ width:17px; height:17px; }}
 </style></head><body><main>
 <h1>Redline</h1>
-<div class="sub">plan review server, port {port}</div>
+<div class="sub">plans and prototypes, port {port}</div>
 {rows}
 </main></body></html>"""
 
@@ -658,7 +709,7 @@ def restore_proto(slug, sha, old_entry):
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "PlanServer/1.0"
+    server_version = "Redline/" + VERSION
 
     def log_message(self, fmt, *args):
         pass
@@ -772,7 +823,10 @@ class Handler(BaseHTTPRequestHandler):
     def route_get(self):
         path = self.path.split("?")[0]
         if path == "/api/health":
-            return self.send_json({"ok": True, "time": time.time()})
+            # an identity, so a client can tell this server from any other
+            # app that happens to answer on the port
+            return self.send_json(dict(SERVER_INFO, ok=True, app=APP, version=VERSION,
+                                       pid=os.getpid(), data=DATA, time=time.time()))
         if path in ("/", "/index.html"):
             return self.send_bytes(render_index(self.server.server_address[1]).encode(), "text/html")
         if path.startswith("/vendor/"):
@@ -1031,11 +1085,152 @@ class Handler(BaseHTTPRequestHandler):
         self.send_json({"error": "not found"}, 404)
 
 
-def daemonize():
-    """Detach into its own session (so a hook or shell exiting cannot take
-    the server down) and log to <data>/server.log. POSIX only."""
+# ---------- one server per data directory ----------
+
+def _direct():
+    """An opener that ignores proxy settings: we only ever talk to loopback."""
+    return urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
+
+def read_runtime():
+    try:
+        with open(RUNTIME_FILE) as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return None
+
+
+def write_runtime(info):
+    tmp = RUNTIME_FILE + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(info, f, indent=2)
+    os.replace(tmp, RUNTIME_FILE)
+
+
+def clear_runtime():
+    """On a clean stop keep the file (its port is the preference for the
+    next start) but mark it stopped. The lock, not this file, says whether
+    Redline is running."""
+    info = read_runtime()
+    if info and info.get("pid") == os.getpid():
+        info.update(pid=None, stopped=time.time())
+        write_runtime(info)
+
+
+def take_lock():
+    """The running server holds an exclusive lock on server.lock for its
+    whole life. Returns the open lock file, or None if another process
+    holds it. A crashed server releases it automatically."""
+    f = open(LOCK_FILE, "a+")
+    if fcntl is None:
+        return f
+    try:
+        fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        return f
+    except OSError:
+        f.close()
+        return None
+
+
+def identify(url):
+    """The health payload if url is the Redline serving this data dir."""
+    try:
+        with _direct().open(url + "/api/health", timeout=1.0) as r:
+            h = json.loads(r.read().decode())
+    except Exception:
+        return None
+    if h.get("app") != APP:
+        return None
+    if os.path.realpath(h.get("data", "")) != os.path.realpath(DATA):
+        return None
+    return h
+
+
+def running_url(wait=5.0):
+    """URL of the Redline serving this data dir, or None when none runs.
+    Waits briefly if another process holds the lock but is still starting."""
+    deadline = time.time() + wait
+    while True:
+        lock = take_lock()
+        if lock is not None:
+            lock.close()  # nobody holds it: not running
+            return None
+        info = read_runtime()
+        if info and identify(info.get("url", "")):
+            return info["url"]
+        if time.time() > deadline:
+            raise SystemExit("Redline holds %s but is not answering%s" % (
+                LOCK_FILE, " (pid %s)" % info.get("pid") if info else ""))
+        time.sleep(0.1)
+
+
+def port_busy(port):
+    """Busy if anything accepts connections on either loopback address, or
+    the IPv4 port cannot be bound. Checking ::1 too catches a dev server
+    that holds the port over IPv6 only, which would otherwise make
+    localhost and 127.0.0.1 reach different apps."""
+    for family, host in ((socket.AF_INET, "127.0.0.1"), (socket.AF_INET6, "::1")):
+        try:
+            s = socket.socket(family, socket.SOCK_STREAM)
+        except OSError:
+            continue  # no IPv6 on this machine
+        s.settimeout(0.3)
+        try:
+            if s.connect_ex((host, port)) == 0:
+                return True
+        except OSError:
+            pass
+        finally:
+            s.close()
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        s.bind(("127.0.0.1", port))
+    except OSError:
+        return True
+    finally:
+        s.close()
+    return False
+
+
+def choose_port(explicit):
+    """explicit (--port or REDLINE_PORT), else the last port used (so open
+    tabs keep working), else DEFAULT_PORT; then count upward."""
+    last = (read_runtime() or {}).get("port")
+    first = explicit or last or DEFAULT_PORT
+    base = explicit or DEFAULT_PORT
+    tried = []
+    for port in [first] + list(range(base, base + PORT_SPAN + 1)):
+        if port in tried:
+            continue
+        tried.append(port)
+        if not port_busy(port):
+            return port
+    raise SystemExit("Redline found no free port in %d..%d" % (base, base + PORT_SPAN))
+
+
+class V6Server(ThreadingHTTPServer):
+    """The same app on [::1], so localhost reaches Redline whichever
+    address family it resolves to first."""
+    address_family = socket.AF_INET6
+
+    def server_bind(self):
+        try:
+            self.socket.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
+        except (OSError, AttributeError):
+            pass
+        super().server_bind()
+
+
+def detach(url):
+    """Fork into the background (own session, logging to the data dir).
+    The parent waits until the child answers, then reports and exits."""
     if os.fork() > 0:
-        os._exit(0)
+        for _ in range(50):
+            if identify(url):
+                break
+            time.sleep(0.1)
+        return False
     os.setsid()
     if os.fork() > 0:
         os._exit(0)
@@ -1044,28 +1239,94 @@ def daemonize():
     os.dup2(log.fileno(), 2)
     devnull = os.open(os.devnull, os.O_RDONLY)
     os.dup2(devnull, 0)
-    with open(os.path.join(DATA, "server.pid"), "w") as f:
-        f.write(str(os.getpid()))
+    return True
+
+
+def stop_server():
+    url = running_url(wait=1.0)
+    if not url:
+        print("Redline is not running (data: %s)" % DATA)
+        return 0
+    pid = (read_runtime() or {}).get("pid")
+    if not pid:
+        print("Redline is running at %s but its pid is unknown" % url)
+        return 1
+    os.kill(pid, signal.SIGTERM)
+    for _ in range(50):
+        lock = take_lock()
+        if lock is not None:
+            lock.close()
+            print("Redline stopped")
+            return 0
+        time.sleep(0.1)
+    print("Redline (pid %s) did not stop" % pid)
+    return 1
+
+
+def _terminate(signum, frame):
+    raise SystemExit(0)
 
 
 def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--port", type=int, default=int(os.environ.get("REDLINE_PORT", 4747)))
+    ap = argparse.ArgumentParser(description="Redline review server")
+    ap.add_argument("--port", type=int, default=None,
+                    help="preferred port (default: REDLINE_PORT, the last port used, or 4747)")
     ap.add_argument("--daemon", action="store_true",
-                    help="run in the background, logging to <data>/server.log")
-    ap.add_argument("--print-data", action="store_true",
-                    help="print the review data directory and exit")
+                    help="start in the background unless already running, then report")
+    ap.add_argument("--url", action="store_true",
+                    help="print the running server's URL, starting it in the background if needed")
+    ap.add_argument("--status", action="store_true", help="report whether it is running")
+    ap.add_argument("--stop", action="store_true", help="stop the running server")
+    ap.add_argument("--print-data", action="store_true", help="print the data directory")
     args = ap.parse_args()
+    explicit = args.port or (int(os.environ["REDLINE_PORT"]) if os.environ.get("REDLINE_PORT") else None)
+
     if args.print_data:
         print(DATA)
-        return
-    # bind before detaching, so a busy port fails loudly in the foreground
-    srv = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
-    if args.daemon:
-        daemonize()
-    print("plan server on http://127.0.0.1:%d (data: %s)" % (args.port, DATA), flush=True)
-    srv.serve_forever()
+        return 0
+    if args.stop:
+        return stop_server()
+    if args.status:
+        url = running_url(wait=1.0)
+        print(("Redline is running at %s" % url if url else "Redline is not running")
+              + " (data: %s)" % DATA)
+        return 0 if url else 1
+
+    url = running_url()
+    lock = None
+    if not url:
+        lock = take_lock()
+        if lock is None:  # another start won the race; report that one
+            url = running_url()
+    if url:
+        print(url if args.url else "Redline is running at %s (data: %s)" % (url, DATA))
+        return 0
+
+    port = choose_port(explicit)
+    url = "http://127.0.0.1:%d" % port
+    srv4 = ThreadingHTTPServer(("127.0.0.1", port), Handler)
+    try:
+        srv6 = V6Server(("::1", port, 0, 0), Handler)
+    except OSError:
+        srv6 = None
+    if args.daemon or args.url:
+        if not detach(url):
+            print(url if args.url else "Redline started at %s (data: %s)" % (url, DATA), flush=True)
+            os._exit(0)
+    SERVER_INFO.update(port=port, url=url, started=time.time())
+    write_runtime(dict(SERVER_INFO, pid=os.getpid(), app=APP, version=VERSION, data=DATA))
+    signal.signal(signal.SIGTERM, _terminate)
+    signal.signal(signal.SIGINT, _terminate)
+    if srv6:
+        threading.Thread(target=srv6.serve_forever, daemon=True).start()
+    print("Redline on %s (data: %s)" % (url, DATA), flush=True)
+    try:
+        srv4.serve_forever()
+    finally:
+        clear_runtime()
+        lock.close()
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

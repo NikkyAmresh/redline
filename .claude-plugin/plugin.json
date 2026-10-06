@@ -1,7 +1,7 @@
 {
   "name": "redline",
   "description": "Review Claude Code plans like a doc and playable prototypes like a design: inline comments, suggested edits and component pins in the browser that land back in the session.",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": {
     "name": "Nikky Amresh",
     "url": "https://github.com/NikkyAmresh"
