@@ -164,7 +164,7 @@ plan: <workspace>/<plan-slug>
 6. **Real sites.** When the user names an existing website or app, look at it for reference (browser screenshots if a browser tool is available), then rebuild the layout with dummy data and placeholder branding. Do not mirror the site, copy its assets or reuse its logo.
 7. **Offline by default.** Prefer vanilla JS plus the optional kit. Pull a framework from cdnjs or jsdelivr only when the prototype genuinely needs one.
 
-The optional kit at `/static/kit.js` covers most needs: `Kit.screen(name, render)`, `Kit.start({home})`, `Kit.go(path)`, `Kit.back()`, `Kit.state()` for `?state=`, `data-go="cart"` and `data-back` attributes, `Kit.fake` (seeded names, cities, prices, dates, words, SVG initial avatars), `Kit.money`, `Kit.toast`, `Kit.sheet`, `Kit.modal`, `Kit.skeleton` and `Kit.delay`. `examples/plan-server/sprout-shop.proto/index.html` in the Redline repo is a complete five-screen example to copy patterns from.
+The optional kit at `/static/kit.js` covers most needs: `Kit.screen(name, render)`, `Kit.start({home})`, `Kit.go(path)`, `Kit.back()`, `Kit.state()` for `?state=`, `data-go="cart"` and `data-back` attributes, `Kit.fake` (seeded names, cities, prices, dates, words, SVG initial avatars), `Kit.money`, `Kit.toast`, `Kit.sheet`, `Kit.modal`, `Kit.skeleton` and `Kit.delay`. `examples/demo/sprout-shop.proto/index.html` in the Redline repo is a complete five-screen example to copy patterns from.
 
 ### What the user does
 

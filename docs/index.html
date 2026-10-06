@@ -7,7 +7,7 @@
 <meta name="description" content="Redline turns Claude Code plans into versioned pages in your browser: mermaid diagrams, inline comments, suggested edits, and threads that land back in the session that wrote the plan.">
 <meta property="og:title" content="Redline: review Claude's plans in the browser">
 <meta property="og:description" content="Google-Docs-style plan review for Claude Code. One Python file, zero dependencies, everything on localhost.">
-<meta property="og:image" content="https://redline.algofunds.in/assets/viewer.png">
+<meta property="og:image" content="https://redline.algofunds.in/assets/plan-viewer.png">
 <meta property="og:url" content="https://redline.algofunds.in">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
@@ -286,15 +286,15 @@ footer a:hover { color:var(--accent); }
 
   <pre class="code"><span class="p">$</span> git clone https://github.com/NikkyAmresh/redline ~/.claude/plan-server
 <span class="p">$</span> ln -s ../plan-server/skill ~/.claude/skills/plan-review
-<span class="p">$</span> python3 ~/.claude/plan-server/server.py   <span class="c"># http://localhost:4747</span></pre>
+<span class="p">$</span> python3 ~/.claude/plan-server/server.py   <span class="c"># http://127.0.0.1:4747</span></pre>
 </main>
 
 <div class="wide shot">
   <div class="frame">
-    <div class="head"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">localhost:4747/plan/plan-server/v1</span></div>
-    <img src="assets/viewer.png" width="1512" height="945" alt="Redline viewer: a rendered plan with a mermaid sequence diagram on the left and a review rail on the right showing a thread that needs a reply, a draft comment, and a suggested edit">
+    <div class="head"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">127.0.0.1:4747/plan/demo/delivery-slots</span></div>
+    <img src="assets/plan-viewer.png" width="1512" height="945" alt="Redline viewer: the demo plan rendered with mermaid diagrams on the left and a review rail on the right showing a thread that needs a reply, a draft comment, and a suggested edit">
   </div>
-  <div class="cap">a real plan under review: diagrams on the left, your feedback rail on the right</div>
+  <div class="cap">the demo plan under review: diagrams on the left, your feedback rail on the right</div>
 </div>
 
 <main>
@@ -348,6 +348,7 @@ footer a:hover { color:var(--accent); }
       <li>Run independently: hand a feedback batch to a background agent and keep your session's context clean</li>
       <li>Checkboxes tick live while Claude implements, so the plan doubles as a progress board</li>
       <li>Plans survive /clear, compaction, and restarts; they are just files on disk</li>
+      <li>Playable prototypes: Claude builds a clickable dummy of any app, you pin comments onto its components</li>
       <li>One Python stdlib file; marked and mermaid vendored</li>
       <li>MIT licensed, yours to bend</li>
     </ul>
@@ -358,7 +359,7 @@ footer a:hover { color:var(--accent); }
     <h2>Three kinds of note, one review rail.</h2>
     <div class="cards">
       <div class="card">
-        <div class="head"><span class="chip amber">comment</span><span class="sec">Risks and open questions</span></div>
+        <div class="head"><span class="chip amber">comment</span><span class="sec">Phase 1: pick a slot</span></div>
         <div class="quote">"three slots per day"</div>
         Add an evening slot, most customers work office hours.
       </div>
@@ -369,7 +370,7 @@ footer a:hover { color:var(--accent); }
         <div class="prop">Plants wilt in hot delivery vans.</div>
       </div>
       <div class="card attn">
-        <div class="head"><span class="chip red">needs reply</span><span class="sec">Risks and open questions</span></div>
+        <div class="head"><span class="chip red">needs reply</span><span class="sec">Phase 2: real capacity</span></div>
         <div class="quote">"Hold a slot for ten minutes while the customer pays"</div>
         <span class="who you">You</span>Ten minutes feels long on mobile. Can we do five?
         <span class="who claude">Claude</span>Five works for cards, but UPI apps often take longer to hand back. Five with one automatic extension, or a flat eight?
@@ -390,7 +391,7 @@ footer a:hover { color:var(--accent); }
     <h2>Three lines, then ask for a plan.</h2>
     <pre class="code"><span class="p">$</span> git clone https://github.com/NikkyAmresh/redline ~/.claude/plan-server
 <span class="p">$</span> ln -s ../plan-server/skill ~/.claude/skills/plan-review
-<span class="p">$</span> python3 ~/.claude/plan-server/server.py   <span class="c"># http://localhost:4747</span></pre>
+<span class="p">$</span> python3 ~/.claude/plan-server/server.py   <span class="c"># http://127.0.0.1:4747</span></pre>
     <p style="margin-top:16px">Python 3.7+ and Claude Code, on macOS or Linux. Then ask any session for a plan, or say <b>/plan-review</b>. The bundled example plan is itself a live demo: select a sentence and send Claude a note.</p>
     <div class="cta">
       <a class="btn" href="https://github.com/NikkyAmresh/redline">View on GitHub</a>

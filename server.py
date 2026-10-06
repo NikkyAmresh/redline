@@ -51,9 +51,9 @@ for d in (PLANS_DIR, FEEDBACK_DIR, INBOX_DIR, VENDOR_DIR, UPLOADS_DIR):
 
 
 def _seed_examples():
-    """First run only: copy the bundled example plan and prototype into plans/
-    so the live demos work. plans/ itself is local-only and gitignored by the
-    Redline repo."""
+    """First run only: copy the bundled demo plan and demo prototype from
+    examples/ into plans/ so the live demos work. plans/ itself is
+    local-only and gitignored by the Redline repo."""
     has_md = has_proto = False
     for dirpath, dirnames, files in os.walk(PLANS_DIR):
         if any(d.endswith(PROTO_EXT) for d in dirnames):
@@ -61,16 +61,20 @@ def _seed_examples():
         dirnames[:] = [d for d in dirnames if d != ".git" and not d.endswith(PROTO_EXT)]
         if any(f.endswith(".md") for f in files):
             has_md = True
-    example = os.path.join(ROOT, "examples", "plan-server", "v1.md")
-    if not has_md and os.path.exists(example):
-        dest = os.path.join(PLANS_DIR, "plan-server", "v1.md")
-        os.makedirs(os.path.dirname(dest), exist_ok=True)
-        shutil.copyfile(example, dest)
-    proto = os.path.join(ROOT, "examples", "plan-server", "sprout-shop" + PROTO_EXT)
-    if not has_proto and os.path.isdir(proto):
-        dest = os.path.join(PLANS_DIR, "plan-server", "sprout-shop" + PROTO_EXT)
-        if not os.path.exists(dest):
-            shutil.copytree(proto, dest)
+    examples = os.path.join(ROOT, "examples")
+    for dirpath, dirnames, files in os.walk(examples):
+        protos = [d for d in dirnames if d.endswith(PROTO_EXT)]
+        dirnames[:] = [d for d in dirnames if not d.endswith(PROTO_EXT)]
+        dest_dir = os.path.join(PLANS_DIR, os.path.relpath(dirpath, examples))
+        if not has_md:
+            for name in files:
+                if name.endswith(".md"):
+                    os.makedirs(dest_dir, exist_ok=True)
+                    shutil.copyfile(os.path.join(dirpath, name), os.path.join(dest_dir, name))
+        if not has_proto:
+            for d in protos:
+                if not os.path.exists(os.path.join(dest_dir, d)):
+                    shutil.copytree(os.path.join(dirpath, d), os.path.join(dest_dir, d))
 
 
 def _init_plans_repo():
