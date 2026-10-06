@@ -34,7 +34,7 @@ except ImportError:  # Windows: no single-instance lock, everything else works
     fcntl = None
 
 APP = "redline"
-VERSION = "1.3.0"
+VERSION = "1.3.1"
 DEFAULT_PORT = 4747
 PORT_SPAN = 20  # try DEFAULT_PORT..DEFAULT_PORT+20 when a port is taken
 
