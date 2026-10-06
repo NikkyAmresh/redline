@@ -1,187 +1,121 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Redline</title>
-<link rel="stylesheet" href="/static/redline.css">
+<script src="/static/studio.js"></script>
+<link rel="icon" href="/static/mark.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/static/studio.css">
 <script src="/static/rail.js"></script>
-<style>
-html, body { height:100%; }
-body {
-  background:var(--paper); color:var(--ink); overflow:hidden;
-  font:14px/1.5 -apple-system, "Helvetica Neue", sans-serif;
-  display:flex; flex-direction:column;
-}
-svg { flex:none; }
-
-/* ---------- toolbar ---------- */
-#toolbar {
-  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
-  padding:8px 24px; border-bottom:1px solid var(--line); background:var(--paper);
-  font-size:13px;
-}
-.seg { display:inline-flex; border:1px solid var(--line); border-radius:9px; padding:2px;
-       background:var(--surface); }
-.seg button {
-  display:inline-flex; align-items:center; gap:6px; border:0; background:none;
-  color:var(--muted); padding:5px 10px; border-radius:7px; cursor:pointer;
-  font:13px -apple-system, "Helvetica Neue", sans-serif;
-}
-.seg button svg { width:15px; height:15px; }
-.seg button:hover { color:var(--ink); }
-.seg button.on { background:var(--accent-soft); color:var(--accent); }
-.seg button:disabled { opacity:.4; cursor:default; }
-.seg kbd { font:10px ui-monospace, Menlo, monospace; border:1px solid currentColor;
-           border-radius:4px; padding:0 4px; opacity:.7; }
-.tsel {
-  appearance:none; -webkit-appearance:none; border:1px solid var(--line); border-radius:9px;
-  background:var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%236c7180' stroke-width='1.5'/%3E%3C/svg%3E") no-repeat right 10px center;
-  color:var(--ink); padding:6px 28px 6px 10px; font:13px -apple-system, sans-serif;
-  max-width:220px; cursor:pointer;
-}
-.tbtn {
-  display:inline-flex; align-items:center; gap:6px; border:1px solid var(--line);
-  border-radius:9px; background:var(--surface); color:var(--muted); padding:6px 10px;
-  font:13px -apple-system, sans-serif; cursor:pointer; text-decoration:none;
-}
-.tbtn svg { width:14px; height:14px; }
-.tbtn:hover { color:var(--accent); border-color:var(--accent); }
-.spacer { flex:1; }
-#toolbar .switch { font-size:12.5px; }
-
-/* ---------- stage and device ---------- */
-main { flex:1; min-height:0; display:flex; }
-#stage {
-  flex:1; min-width:0; position:relative; overflow:hidden;
-  display:flex; align-items:center; justify-content:center;
-  background-color:var(--paper);
-  background-image:radial-gradient(color-mix(in srgb, var(--muted) 28%, transparent) 1px, transparent 1px);
-  background-size:18px 18px;
-}
-#stage.desktop { align-items:stretch; justify-content:stretch; padding:18px; }
-#fit { position:relative; flex:none; }
-#stage.desktop #fit { flex:1; display:flex; }
-#device {
-  position:absolute; left:0; top:0; transform-origin:0 0;
-  display:flex; flex-direction:column; overflow:hidden;
-  background:#fff; border-radius:28px; border:1px solid var(--line);
-  box-shadow:0 24px 60px rgba(20,22,30,.18), 0 2px 8px rgba(20,22,30,.08);
-}
-#device.chrome { border:12px solid #15171c; border-radius:56px; }
-#device.tablet.chrome { border-width:16px; border-radius:40px; }
-#stage.desktop #device { position:static; flex:1; border-radius:12px; border:1px solid var(--line); }
-#frame { flex:1; width:100%; border:0; display:block; background:#fff; }
-.statusbar, .homebar, .browserbar { display:none; flex:none; background:#fff; color:#111; }
-#device.chrome .statusbar { display:flex; align-items:center; justify-content:space-between;
-  height:47px; padding:0 30px 0 34px; font:600 15px -apple-system, sans-serif; }
-#device.tablet.chrome .statusbar { height:26px; padding:0 22px; font-size:12px; }
-.statusbar .icons { display:flex; gap:6px; align-items:center; }
-.statusbar svg { height:12px; width:auto; }
-#device.chrome .homebar { display:flex; height:30px; align-items:center; justify-content:center; }
-#device.tablet.chrome .homebar { height:22px; }
-.homebar span { width:134px; height:5px; border-radius:3px; background:#111; }
-#device.desktop.chrome .statusbar, #device.desktop.chrome .homebar { display:none; }
-#device.desktop.chrome .browserbar {
-  display:flex; align-items:center; gap:8px; height:38px; padding:0 14px;
-  background:#f1f1f3; border-bottom:1px solid #e3e3e8;
-}
-.browserbar i { width:11px; height:11px; border-radius:50%; background:#d6d6db; display:block; }
-.browserbar i:nth-child(1) { background:#ff5f57; }
-.browserbar i:nth-child(2) { background:#febc2e; }
-.browserbar i:nth-child(3) { background:#28c840; }
-.browserbar .url { flex:1; margin:0 60px 0 14px; height:24px; border-radius:7px; background:#fff;
-  border:1px solid #e3e3e8; color:#6b7280; font:12px ui-monospace, Menlo, monospace;
-  display:flex; align-items:center; padding:0 10px; overflow:hidden; white-space:nowrap; }
-#modehint {
-  position:absolute; left:50%; bottom:16px; transform:translateX(-50%);
-  background:var(--ink); color:var(--paper); border-radius:999px; padding:7px 14px;
-  font:12.5px -apple-system, sans-serif; box-shadow:var(--shadow); pointer-events:none;
-  display:none; white-space:nowrap;
-}
-#modehint.on { display:block; }
-#modehint kbd { font:11px ui-monospace, Menlo, monospace; opacity:.75; }
-
-#rail { position:static; height:auto; }
-
-@media (max-width: 980px) {
-  body { overflow:auto; height:auto; }
-  main { flex-direction:column; }
-  #stage { height:78vh; flex:none; }
-  #toolbar { padding:8px 16px; }
-  header { padding:12px 16px; }
-  .wide { display:none !important; }
-}
-</style>
 </head>
-<body>
+<body class="proto-page">
 
-<header>
-  <a href="/">Redline</a><span style="color:var(--muted)">/</span>
-  <span id="title">&hellip;</span>
-  <select class="pill version" id="version"><option value="__live__" selected>v&hellip; (live)</option></select>
-  <span class="pill" id="pstatus"></span>
-  <a class="pill" id="planlink" hidden title="Open the plan behind this prototype"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5"/></svg>plan</a>
-  <button class="pill" id="download" title="Download this version">&#8595; download</button>
-  <span id="live"><span class="dot"></span><span id="livetext">connecting</span></span>
+<header class="top">
+  <a class="brand" href="/" aria-label="Redline home"><svg><use href="#mark"/></svg><span>Redline</span></a>
+  <div class="ctx">
+    <span class="vsep"></span>
+    <nav class="crumbs" aria-label="Breadcrumb"><a href="/" id="ws"></a><span class="slash" id="wsSlash">/</span><span class="cur" id="title">&hellip;</span></nav>
+    <button class="pill" id="verBtn" aria-haspopup="menu" aria-expanded="false" title="Versions"><span class="lv"></span><span class="vn" id="verN">v&hellip;</span><span id="verL">(live)</span><svg class="i s12"><use href="#i-chev"/></svg></button>
+    <span class="pill" id="status"><svg class="i s12"><use href="#i-status"/></svg><span></span></span>
+  </div>
+  <button class="cmdk" id="cmdk" aria-label="Open command bar"><svg class="i s14"><use href="#i-search"/></svg><span class="lbl">Jump to a screen or run a command</span><span class="kbds"><kbd class="g mod"></kbd><kbd>K</kbd></span></button>
+  <div class="tools">
+    <button class="hbtn m-only" id="cmdkM" aria-label="Open command bar"><svg class="i"><use href="#i-search"/></svg></button>
+    <a class="hbtn" id="planLink" hidden title="Open the plan behind this prototype"><svg class="i"><use href="#i-plan"/></svg><span class="lbl">Plan</span></a>
+    <a class="hbtn" id="dl" title="Download this version"><svg class="i"><use href="#i-down"/></svg><span class="ext">.html</span></a>
+    <button class="hbtn" data-theme-toggle></button>
+    <span class="live" id="live"><i></i><span id="livetext">Connecting</span></span>
+  </div>
 </header>
 
-<div id="histbar">
-  <span id="histtext"></span>
-  <button id="histrestore">Restore this version</button>
-  <button id="histback">Back to live</button>
-</div>
-
-<div id="toolbar">
-  <div class="seg" id="modes">
-    <button data-mode="interact" class="on" title="Use the prototype"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3l14 8-6 2-3 6z"/></svg>Interact</button>
-    <button data-mode="comment" title="Click any component to comment on it (C)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20.5l1.4-4.9A8 8 0 1 1 21 12z"/></svg>Comment <kbd>C</kbd></button>
-  </div>
-  <div class="seg" id="devices">
-    <button data-device="mobile" title="Phone, 390 wide"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2.5" width="10" height="19" rx="2"/><path d="M11 18.5h2"/></svg><span class="wide">Phone</span></button>
-    <button data-device="tablet" title="Tablet, 820 wide"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2.5" width="16" height="19" rx="2"/><path d="M11 18.5h2"/></svg><span class="wide">Tablet</span></button>
-    <button data-device="desktop" title="Desktop, fills the stage"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="4" width="19" height="12.5" rx="1.5"/><path d="M8.5 20.5h7M12 16.5v4"/></svg><span class="wide">Desktop</span></button>
-  </div>
-  <select class="tsel" id="screen" title="Jump to a screen"><option>screens</option></select>
-  <button class="tbtn" id="reset" title="Reload the prototype and reset its state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg><span class="wide">Reset</span></button>
-  <span class="spacer"></span>
-  <label class="switch wide" title="Show pins that are already resolved"><input type="checkbox" id="showres"><span class="track"></span>Resolved</label>
-  <label class="switch wide" title="Draw device chrome around the prototype"><input type="checkbox" id="chrome"><span class="track"></span>Chrome</label>
-  <a class="tbtn" id="newtab" target="_blank" rel="noopener" title="Open the prototype alone in a new tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg><span class="wide">Open</span></a>
-</div>
-
-<main>
-  <section id="stage">
-    <div id="fit">
-      <div id="device">
-        <div class="statusbar"><span>9:41</span><span class="icons">
-          <svg viewBox="0 0 18 12"><rect x="0" y="8" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="5.5" width="3" height="6.5" rx="1" fill="currentColor"/><rect x="10" y="3" width="3" height="9" rx="1" fill="currentColor"/><rect x="15" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg>
-          <svg viewBox="0 0 16 12"><path d="M8 11.5l2.4-2.9a3.6 3.6 0 0 0-4.8 0z" fill="currentColor"/><path d="M3.6 6.3a6.6 6.6 0 0 1 8.8 0M1.2 3.6a10 10 0 0 1 13.6 0" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
-          <svg viewBox="0 0 27 12"><rect x=".5" y=".5" width="23" height="11" rx="3" fill="none" stroke="currentColor" opacity=".45"/><rect x="2" y="2" width="20" height="8" rx="2" fill="currentColor"/><path d="M25 4v4a2 2 0 0 0 0-4z" fill="currentColor" opacity=".45"/></svg>
-        </span></div>
-        <div class="browserbar"><i></i><i></i><i></i><span class="url" id="url"></span></div>
-        <iframe id="frame" title="Prototype" sandbox="allow-scripts allow-forms allow-modals allow-popups allow-downloads"></iframe>
-        <div class="homebar"><span></span></div>
-      </div>
+<div class="app">
+  <aside class="pane pane-left" id="pane-screens" aria-label="Screens and versions">
+    <div class="pl-h"><span>Screens</span><span class="n" id="scount"></span></div>
+    <ul class="outline screens" id="screens"></ul>
+    <div class="pl-gap"></div>
+    <div class="pl-h"><span>Versions</span><span class="n" id="vcount"></span></div>
+    <ul class="versions" id="versions"></ul>
+    <div class="pl-foot">
+      <div class="r"><span>Commands</span><span class="kbds"><kbd class="g mod"></kbd><kbd>K</kbd></span></div>
+      <div class="r"><span>Comment mode</span><span class="kbds"><kbd>C</kbd></span></div>
+      <div class="r"><span>Note on this screen</span><span class="kbds"><kbd>N</kbd></span></div>
     </div>
-    <div id="modehint">Comment mode: click a component, drag a box for an area, hold <kbd>Alt</kbd> for the exact element, <kbd>Esc</kbd> to stop</div>
-  </section>
-  <aside id="rail"></aside>
-</main>
+  </aside>
+
+  <main class="pane pane-stage m-active" id="pane-proto" aria-label="Prototype">
+    <div class="stagebar">
+      <span class="seg" id="modes">
+        <button data-mode="interact" aria-pressed="true" title="Use the prototype"><svg class="i"><use href="#i-pointer"/></svg>Interact</button>
+        <button data-mode="comment" aria-pressed="false" title="Click any component to comment on it (C)"><svg class="i"><use href="#i-comment"/></svg>Comment<kbd>C</kbd></button>
+      </span>
+      <span class="seg" id="devices">
+        <button data-device="mobile" title="Phone, 390 wide" aria-label="Phone"><svg class="i"><use href="#i-phone"/></svg><span class="wide">Phone</span></button>
+        <button data-device="tablet" title="Tablet, 820 wide" aria-label="Tablet"><svg class="i"><use href="#i-tablet"/></svg><span class="wide">Tablet</span></button>
+        <button data-device="desktop" title="Desktop, fills the stage" aria-label="Desktop"><svg class="i"><use href="#i-desktop"/></svg><span class="wide">Desktop</span></button>
+      </span>
+      <select class="tsel" id="screen" title="Jump to a screen" aria-label="Screen"><option>Screens</option></select>
+      <span class="sp"></span>
+      <label class="mini-switch wide" title="Show pins that are already resolved"><button class="switch" role="switch" aria-checked="false" id="showres"></button>Resolved</label>
+      <label class="mini-switch wide" title="Draw device chrome around the prototype"><button class="switch" role="switch" aria-checked="true" id="chrome"></button>Chrome</label>
+      <span class="vsep wide"></span>
+      <button class="icon-btn" id="reset" title="Reload the prototype and reset its state" aria-label="Reset"><svg class="i"><use href="#i-reset"/></svg></button>
+      <a class="icon-btn" id="newtab" target="_blank" rel="noopener" title="Open the prototype alone in a new tab" aria-label="Open in a new tab"><svg class="i"><use href="#i-ext"/></svg></a>
+    </div>
+    <div class="histbar" id="histbar" hidden>
+      <span class="t" id="histtext"></span>
+      <button class="btn-sm solo" id="histrestore">Restore this version</button>
+      <button class="btn-ghost" id="histback">Back to live</button>
+    </div>
+    <section id="stage">
+      <div id="fit">
+        <div id="device">
+          <div class="statusbar"><span>9:41</span><span class="icons">
+            <svg viewBox="0 0 18 12"><rect x="0" y="8" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="5.5" width="3" height="6.5" rx="1" fill="currentColor"/><rect x="10" y="3" width="3" height="9" rx="1" fill="currentColor"/><rect x="15" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg>
+            <svg viewBox="0 0 16 12"><path d="M8 11.5l2.4-2.9a3.6 3.6 0 0 0-4.8 0z" fill="currentColor"/><path d="M3.6 6.3a6.6 6.6 0 0 1 8.8 0M1.2 3.6a10 10 0 0 1 13.6 0" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+            <svg viewBox="0 0 27 12"><rect x=".5" y=".5" width="23" height="11" rx="3" fill="none" stroke="currentColor" opacity=".45"/><rect x="2" y="2" width="20" height="8" rx="2" fill="currentColor"/><path d="M25 4v4a2 2 0 0 0 0-4z" fill="currentColor" opacity=".45"/></svg>
+          </span></div>
+          <div class="browserbar"><i></i><i></i><i></i><span class="url" id="url"></span></div>
+          <iframe id="frame" title="Prototype" sandbox="allow-scripts allow-forms allow-modals allow-popups allow-downloads"></iframe>
+          <div class="homebar"><span></span></div>
+        </div>
+      </div>
+      <div id="modehint"><svg class="i s14"><use href="#i-comment"/></svg>Click a component, drag a box for an area, hold <kbd>Alt</kbd> for the exact element, <kbd>Esc</kbd> to stop</div>
+    </section>
+  </main>
+
+  <aside class="pane pane-right" id="pane-comments" aria-label="Review">
+    <div class="itabs" role="tablist">
+      <button class="itab" role="tab" aria-selected="true" data-tab="comments">Comments <span class="rdot" id="rdot" hidden></span><span class="ct" id="ccount">0</span></button>
+      <button class="itab" role="tab" aria-selected="false" data-tab="history">History</button>
+    </div>
+    <div class="ipanel" id="tab-comments" role="tabpanel"></div>
+    <div class="ipanel" id="tab-history" role="tabpanel" hidden></div>
+    <div class="ifoot" id="ifoot"></div>
+  </aside>
+</div>
+
+<nav class="tabbar" id="tabbar" role="tablist">
+  <button data-pane="pane-screens" aria-selected="false"><svg class="i"><use href="#i-list"/></svg>Screens</button>
+  <button data-pane="pane-proto" aria-selected="true"><svg class="i"><use href="#i-phone"/></svg>Prototype</button>
+  <button data-pane="pane-comments" aria-selected="false"><svg class="i"><use href="#i-comment"/></svg>Comments<span class="tb-badge" id="tbBadge" hidden></span></button>
+</nav>
+<div class="pop" id="verPop" role="menu" hidden></div>
 
 <script>
 const slug = location.pathname.split('/').filter(Boolean).slice(1).map(decodeURIComponent).join('/');
+const ws = slug.includes('/') ? slug.split('/')[0] : '';
 const {api, toast, esc} = Redline;
-const frame = document.getElementById('frame');
-const stage = document.getElementById('stage');
-const fit = document.getElementById('fit');
-const device = document.getElementById('device');
+const {MAC, theme, vLabel, niceDate, subjectTitle, showPane, setLive} = Studio;
+const $ = id => document.getElementById(id);
+const frame = $('frame'), stage = $('stage'), fit = $('fit'), device = $('device');
 
 const DEVICES = {
-  mobile: {w: 390, h: 844, bars: [47, 30], border: 12},
-  tablet: {w: 820, h: 1180, bars: [26, 22], border: 16},
+  mobile: {w: 390, h: 844, border: 12},
+  tablet: {w: 820, h: 1180, border: 16},
   desktop: null,
 };
+const DEVICE_NAMES = {mobile: 'Phone', tablet: 'Tablet', desktop: 'Desktop'};
 
 const state = {
   proto: null, mode: 'interact', device: null, chrome: true, showResolved: false,
@@ -194,12 +128,6 @@ const store = {
   set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} },
 };
 
-function setLive(on) {
-  const el = document.getElementById('live');
-  el.classList.toggle('on', on);
-  document.getElementById('livetext').textContent = on ? 'live' : 'server offline';
-}
-
 function post(msg) {
   if (frame.contentWindow) frame.contentWindow.postMessage(Object.assign({__redline: 1}, msg), '*');
 }
@@ -208,19 +136,22 @@ function base() {
   return state.historySha ? '/p-at/' + state.historySha + '/' + slug + '/' : '/p/' + slug + '/';
 }
 
-/* ---------- review rail ---------- */
+/* ---------- review panel ---------- */
+
+const RANK = {answered: 4, draft: 3, submitted: 2, resolved: 1};
+const BADGE = {answered: 'b-reply', draft: 'b-draft', submitted: 'b-waiting', resolved: 'b-resolved'};
 
 const rail = Redline.mount({
   slug,
-  rail: document.getElementById('rail'),
+  list: $('tab-comments'),
+  footer: $('ifoot'),
   hint: 'Press <kbd>C</kbd> or pick Comment, then click any component in the prototype to pin a ' +
         'comment or a copy change to it. Drag a box to comment on an area. ' +
         'Drafts collect here; send them to Claude in one batch.',
   actions: [
-    {label: '+ Note on this screen', title: 'A note about the screen on show, not one component',
+    {label: 'Note on this screen', key: 'N', title: 'A note about the screen on show, not one component',
      onClick: () => openScreenNote()},
-    {label: '+ General note', title: 'A note about the whole prototype',
-     onClick: () => rail.openForm('comment', {label: 'General note on the whole prototype', rect: null})},
+    {label: 'General note', title: 'A note about the whole prototype', onClick: () => generalNote()},
   ],
   decorate: item => {
     const a = item.anchor;
@@ -230,20 +161,29 @@ const rail = Redline.mount({
     return {
       num: pinNumber(item.id),
       where: a.component || (a.tag ? a.tag + (a.box ? ' area' : '') : ''),
-      chip: detached ? '<span class="chip detached" title="This component is no longer found on its screen">detached</span>' : '',
+      chip: detached ? '<span class="chip" title="This component is no longer found on its screen">detached</span>' : '',
     };
   },
   onCardClick: item => {
     const a = item.anchor;
     if (!a || state.historySha) return;
+    showPane('pane-proto');
     if (state.detached.has(item.id)) toast('This component is no longer on its screen; Claude still has the details');
     post({type: 'goto', route: a.route, screen: a.screen, focus: item.kind === 'pin' ? item.id : null});
+  },
+  onRender: () => {
+    const c = rail.counts();
+    $('ccount').textContent = c.total;
+    $('rdot').hidden = !c.answered;
+    $('tbBadge').hidden = !c.answered;
+    $('tbBadge').textContent = c.answered;
+    renderScreens();
   },
   refresh: () => refresh(),
 });
 
 function openScreenNote() {
-  if (state.historySha) return;
+  if (state.historySha) { toast('Go back to the live version to comment'); return; }
   const title = state.title || state.screen || 'this screen';
   rail.openForm('comment', {
     label: 'Note on the ' + title + ' screen', rect: null,
@@ -251,6 +191,11 @@ function openScreenNote() {
             anchor: {screen: state.screen, title, route: state.route,
                      viewport: {name: state.device, w: frame.clientWidth, h: frame.clientHeight}}},
   });
+}
+
+function generalNote() {
+  if (state.historySha) { toast('Go back to the live version to comment'); return; }
+  rail.openForm('comment', {label: 'General note on the whole prototype', rect: null});
 }
 
 // pins are numbered in the order they were made, the same on cards and markers
@@ -270,14 +215,49 @@ function sendPins() {
   post({type: 'pins', pins, showResolved: state.showResolved});
 }
 
+/* ---------- screens ---------- */
+
+function renderScreens() {
+  // the left list, with a badge of the comments on each screen
+  const per = new Map();
+  if (!state.historySha) for (const i of rail.items()) {
+    const s = i.anchor && i.anchor.screen;
+    if (s) { if (!per.has(s)) per.set(s, []); per.get(s).push(i.status); }
+  }
+  $('scount').textContent = state.screens.length || '';
+  $('screens').innerHTML = state.screens.length ? state.screens.map(s => {
+    const st = per.get(s.id) || [];
+    const top = st.slice().sort((a, b) => RANK[b] - RANK[a])[0];
+    return '<li><a data-screen="' + esc(s.id) + '"' + (s.id === state.screen ? ' class="on"' : '') + '>'
+      + '<svg class="i s14"><use href="#i-screen"/></svg><span class="t">' + esc(s.title) + '</span>'
+      + (st.length ? '<span class="badge ' + BADGE[top] + '">' + st.length + '</span>' : '') + '</a></li>';
+  }).join('') : '<li class="pl-empty">' + (state.route ? esc(state.route) + '<br>' : '') + 'No screens tagged</li>';
+  // and the picker in the stage bar
+  const sel = $('screen');
+  if (!state.screens.length) {
+    sel.innerHTML = '<option>' + esc(state.route || 'No screens tagged') + '</option>';
+    sel.disabled = true;
+    return;
+  }
+  sel.disabled = false;
+  sel.innerHTML = state.screens.map(s =>
+    '<option value="' + esc(s.id) + '"' + (s.id === state.screen ? ' selected' : '') + '>' + esc(s.title) + '</option>').join('');
+}
+
+function gotoScreen(id) {
+  showPane('pane-proto');
+  post({type: 'goto', screen: id});
+}
+$('screens').addEventListener('click', e => { const a = e.target.closest('a[data-screen]'); if (a) gotoScreen(a.dataset.screen); });
+$('screen').onchange = e => gotoScreen(e.target.value);
+
 /* ---------- device stage ---------- */
 
 function setDevice(name, remember) {
   if (!(name in DEVICES)) name = 'mobile';
   state.device = name;
   if (remember) store.set('rl-device:' + slug, name);
-  document.querySelectorAll('#devices button').forEach(b =>
-    b.classList.toggle('on', b.dataset.device === name));
+  document.querySelectorAll('#devices button').forEach(b => b.setAttribute('aria-pressed', b.dataset.device === name));
   device.className = name + (state.chrome ? ' chrome' : '');
   stage.classList.toggle('desktop', name === 'desktop');
   layoutStage();
@@ -290,12 +270,12 @@ function layoutStage() {
     fit.style.width = fit.style.height = '';
     return;
   }
-  const border = state.chrome ? d.border : 1;
+  const border = state.chrome ? d.border : 0;
   const W = d.w + border * 2, H = d.h + border * 2;
   // the iframe keeps the true device width; chrome bars come out of the height
   device.style.width = W + 'px';
   device.style.height = H + 'px';
-  const pad = 36;
+  const pad = Studio.isPhone() ? 14 : 32;
   const s = Math.min(1, (stage.clientWidth - pad * 2) / W, (stage.clientHeight - pad * 2) / H);
   device.style.transform = 'scale(' + s + ')';
   fit.style.width = W * s + 'px';
@@ -304,53 +284,63 @@ function layoutStage() {
 
 new ResizeObserver(layoutStage).observe(stage);
 
-document.getElementById('devices').onclick = e => {
+$('devices').onclick = e => {
   const b = e.target.closest('[data-device]');
   if (b) setDevice(b.dataset.device, true);
 };
 
-const chromeBox = document.getElementById('chrome');
-chromeBox.checked = state.chrome = store.get('rl-chrome') !== '0';
-chromeBox.onchange = () => {
-  state.chrome = chromeBox.checked;
-  store.set('rl-chrome', state.chrome ? '1' : '0');
+function setChrome(on) {
+  state.chrome = on;
+  $('chrome').setAttribute('aria-checked', on);
+  store.set('rl-chrome', on ? '1' : '0');
   setDevice(state.device);
-};
-
-const showres = document.getElementById('showres');
-showres.onchange = () => { state.showResolved = showres.checked; sendPins(); };
+}
+function setShowResolved(on) {
+  state.showResolved = on;
+  $('showres').setAttribute('aria-checked', on);
+  sendPins();
+}
+state.chrome = store.get('rl-chrome') !== '0';
+$('chrome').setAttribute('aria-checked', state.chrome);
+$('chrome').onclick = e => { e.preventDefault(); setChrome(!state.chrome); };
+$('showres').onclick = e => { e.preventDefault(); setShowResolved(!state.showResolved); };
 
 /* ---------- modes ---------- */
 
 function setMode(m) {
   if (state.historySha) m = 'interact';
   state.mode = m;
-  document.querySelectorAll('#modes button').forEach(b =>
-    b.classList.toggle('on', b.dataset.mode === m));
-  document.getElementById('modehint').classList.toggle('on', m === 'comment');
+  document.querySelectorAll('#modes button').forEach(b => b.setAttribute('aria-pressed', b.dataset.mode === m));
+  $('modehint').classList.toggle('on', m === 'comment');
+  stage.classList.toggle('commenting', m === 'comment');
   post({type: 'mode', mode: m});
 }
 
-document.getElementById('modes').onclick = e => {
+$('modes').onclick = e => {
   const b = e.target.closest('[data-mode]');
   if (b && !b.disabled) setMode(b.dataset.mode);
 };
 
 function onKey(key) {
+  if (key === 'palette') { pal.isOpen() ? pal.close() : pal.open(); return; }
   if (key === 'Escape') {
     if (rail.isFormOpen()) rail.closeForm();
     else if (state.mode === 'comment') setMode('interact');
   } else if (key === 'c' && !rail.isFormOpen() && !state.historySha) {
     setMode(state.mode === 'comment' ? 'interact' : 'comment');
+  } else if (key === 'n' && !rail.isFormOpen()) {
+    openScreenNote();
   }
 }
 
 document.addEventListener('keydown', e => {
   const t = e.target;
-  if (t && t.matches && t.matches('input, textarea, select')) return;
-  if (e.metaKey || e.ctrlKey || e.altKey) return;
-  if (e.key === 'c' || e.key === 'C') onKey('c');
-  else if (e.key === 'Escape') onKey('Escape');
+  const typing = t && t.closest && t.closest('input, textarea, select, [contenteditable="true"]');
+  const mod = e.metaKey || e.ctrlKey;
+  if (mod && e.key === 'Enter' && !typing && !rail.isFormOpen()) { e.preventDefault(); if (!state.historySha) rail.send(); return; }
+  if (typing || mod || e.altKey || pal.isOpen()) return;
+  const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+  if (k === 'c' || k === 'n' || k === 'Escape') { if (k !== 'Escape') e.preventDefault(); onKey(k); }
 });
 
 /* ---------- frame ---------- */
@@ -367,22 +357,7 @@ function loadFrame(keepRoute) {
   frame.src = frameUrl(keepRoute ? state.route : '');
 }
 
-document.getElementById('reset').onclick = () => loadFrame(false);
-
-function renderScreens() {
-  const sel = document.getElementById('screen');
-  if (!state.screens.length) {
-    sel.innerHTML = '<option>' + esc(state.route || 'no screens tagged') + '</option>';
-    sel.disabled = true;
-    return;
-  }
-  sel.disabled = false;
-  sel.innerHTML = state.screens.map(s =>
-    '<option value="' + esc(s.id) + '"' + (s.id === state.screen ? ' selected' : '') + '>'
-    + esc(s.title) + '</option>').join('');
-}
-
-document.getElementById('screen').onchange = e => post({type: 'goto', screen: e.target.value});
+$('reset').onclick = () => loadFrame(false);
 
 window.addEventListener('message', e => {
   if (e.source !== frame.contentWindow || !e.data || !e.data.__redline) return;
@@ -401,14 +376,16 @@ window.addEventListener('message', e => {
     state.title = m.title || '';
     state.route = m.route || '';
     renderScreens();
-    document.getElementById('url').textContent = base() + state.route;
-    document.getElementById('newtab').href = base() + state.route;
+    $('url').textContent = base() + state.route;
+    $('newtab').href = base() + state.route;
   } else if (m.type === 'pick') {
     onPick(m);
   } else if (m.type === 'shot') {
     const done = state.shots.get(m.pid);
     if (done) { state.shots.delete(m.pid); done(m.data); }
   } else if (m.type === 'pinclick') {
+    showPane('pane-comments');
+    showTab('comments');
     rail.focusCard(m.id);
   } else if (m.type === 'detached') {
     state.detached = new Set(m.ids || []);
@@ -458,25 +435,40 @@ function onPick(m) {
     editText: m.text,
     allowEdit: m.editable,
     rect: toPage(m.rect),
-    place: 'side',
+    place: Studio.isPhone() ? 'below' : 'side',
     extra: {kind: 'pin', anchor: a, section: title, quote: (m.text || m.label).slice(0, 300)},
     onClose: () => post({type: 'hold', on: false}),
   });
   rail.attachImage(shot.then(data => data ? rail.uploadDataUrl(data) : null), true);
 }
 
+/* ---------- inspector tabs ---------- */
+
+document.querySelector('.itabs').addEventListener('click', e => {
+  const t = e.target.closest('.itab');
+  if (t) showTab(t.dataset.tab);
+});
+function showTab(name) {
+  document.querySelectorAll('.itab').forEach(t => t.setAttribute('aria-selected', t.dataset.tab === name));
+  ['comments', 'history'].forEach(n => { $('tab-' + n).hidden = n !== name; });
+}
+
 /* ---------- live data ---------- */
 
-function renderMeta(p) {
-  const meta = p.meta || {};
-  document.getElementById('title').textContent = meta.title || slug;
-  document.title = (meta.title || slug) + ' · Redline';
-  const vsel = document.getElementById('version');
-  vsel.querySelector('option[value="__live__"]').textContent = 'v' + (meta.version || '1') + ' (live)';
-  document.getElementById('pstatus').textContent = meta.status || 'draft';
-  const pl = document.getElementById('planlink');
+function header(meta, live) {
+  const title = meta.title || slug;
+  $('title').textContent = title;
+  document.title = title + ' · Redline';
+  $('ws').textContent = ws;
+  $('ws').hidden = $('wsSlash').hidden = !ws;
+  $('verN').textContent = 'v' + (meta.version || '1');
+  $('verL').textContent = live ? '(live)' : '(read only)';
+  $('verBtn').classList.toggle('old', !live);
+  $('status').querySelector('span').textContent = meta.status || 'draft';
+  const pl = $('planLink');
   pl.hidden = !meta.plan;
   if (meta.plan) pl.href = '/plan/' + meta.plan;
+  $('dl').href = state.historySha ? '/raw-at/' + state.historySha + '/' + slug : '/raw/' + slug;
 }
 
 async function refresh() {
@@ -489,7 +481,7 @@ async function refresh() {
   if (rail.busy()) return;
   if (!state.proto) {
     state.proto = p;
-    renderMeta(p);
+    header(p.meta, true);
     setDevice(store.get('rl-device:' + slug) || p.meta.device || 'mobile');
     rail.setFeedback(fb);
     loadFrame(false);
@@ -498,7 +490,7 @@ async function refresh() {
   if (p.mtime !== state.proto.mtime) {
     const oldV = state.proto.meta.version;
     state.proto = p;
-    renderMeta(p);
+    header(p.meta, true);
     loadFrame(true);
     if (oldV !== p.meta.version) {
       toast('Claude updated the prototype to v' + p.meta.version);
@@ -508,64 +500,72 @@ async function refresh() {
   if (rail.setFeedback(fb)) sendPins();
 }
 
-/* ---------- version history ---------- */
+/* ---------- versions ---------- */
+
+const liveVersion = () => String(state.proto && state.proto.meta.version || '');
 
 async function loadHistory() {
   let data;
   try { data = await api('/api/history/' + slug); } catch (e) { return; }
   state.history = data.commits || [];
-  const vsel = document.getElementById('version');
-  const keep = vsel.value;
-  vsel.querySelectorAll('option:not([value="__live__"])').forEach(o => o.remove());
-  for (const c of state.history) {
-    const opt = document.createElement('option');
-    opt.value = c.sha;
-    opt.textContent = (c.version ? 'v' + c.version : c.short) + ' · ' + c.date;
-    vsel.appendChild(opt);
-  }
-  vsel.value = keep && [...vsel.options].some(o => o.value === keep) ? keep : '__live__';
+  renderVersions();
 }
+
+function renderVersions() {
+  $('vcount').textContent = state.history.length || '';
+  $('versions').innerHTML = Studio.versionList(state.history, liveVersion(), state.historySha);
+  $('tab-history').innerHTML = Studio.historyTimeline(state.history, liveVersion(), state.historySha, slug);
+}
+
+function pickVersion(b) {
+  showPane('pane-proto');
+  if (b.dataset.live === 'true') exitHistory(); else if (b.dataset.sha) enterHistory(b.dataset.sha);
+}
+$('versions').addEventListener('click', e => { const b = e.target.closest('.vrow'); if (b) pickVersion(b); });
+$('tab-history').addEventListener('click', e => { const b = e.target.closest('button[data-sha]'); if (b) pickVersion(b); });
+
+Studio.menu($('verBtn'), $('verPop'), () => Studio.versionMenuItems(state.history, liveVersion(), state.historySha)
+  + '<div class="pop-f"><button data-act="download">Download this version</button></div>', b => {
+  if (b.dataset.act === 'download') location.href = $('dl').href;
+  else pickVersion(b);
+});
 
 async function enterHistory(sha) {
   let data;
   try { data = await api('/api/history-at/' + sha + '/' + slug); }
-  catch (e) { toast('Could not load that version'); document.getElementById('version').value = '__live__'; return; }
+  catch (e) { toast('Could not load that version'); return; }
   if (rail.isFormOpen()) rail.closeForm();
   setMode('interact');
   state.historySha = sha;
   rail.setDisabled(true);
   document.querySelector('#modes [data-mode="comment"]').disabled = true;
   const c = state.history.find(h => h.sha === sha);
-  document.getElementById('histbar').classList.add('on');
-  document.getElementById('histtext').textContent =
-    'Read only · ' + (data.meta.title || slug) + ' ' +
-    (c && c.version ? 'v' + c.version : (c ? c.short : sha.slice(0, 7))) +
-    (c ? ' · ' + c.date + ' · ' + c.subject : '');
-  document.getElementById('pstatus').textContent = data.meta.status || '';
+  $('histbar').hidden = false;
+  $('histtext').textContent = 'Read only: ' + (c ? vLabel(c) + ', ' + niceDate(c.date) + ', ' + subjectTitle(c) : sha.slice(0, 7));
+  header(Object.assign({}, state.proto ? state.proto.meta : {}, data.meta || {}), false);
   layoutStage();
   frame.src = frameUrl(state.route, base());
+  renderVersions();
+  renderScreens();
 }
 
 function exitHistory() {
+  if (!state.historySha) return;
   state.historySha = null;
-  document.getElementById('histbar').classList.remove('on');
+  $('histbar').hidden = true;
   rail.setDisabled(false);
   document.querySelector('#modes [data-mode="comment"]').disabled = false;
-  document.getElementById('version').value = '__live__';
-  if (state.proto) renderMeta(state.proto);
+  if (state.proto) header(state.proto.meta, true);
   layoutStage();
   loadFrame(true);
+  renderVersions();
+  renderScreens();
 }
 
-document.getElementById('version').addEventListener('change', e => {
-  if (e.target.value === '__live__') exitHistory();
-  else enterHistory(e.target.value);
-});
-document.getElementById('histback').onclick = exitHistory;
-
-document.getElementById('histrestore').onclick = async () => {
+$('histback').onclick = exitHistory;
+$('histrestore').onclick = async () => {
   if (!state.historySha) return;
-  if (!confirm('Restore this version as the new latest? This adds it as a new version; nothing is lost.')) return;
+  if (!confirm('Restore this version as the new latest? It is added as a new version; nothing is lost.')) return;
   try {
     const r = await api('/api/restore/' + state.historySha + '/' + slug, {});
     toast('Restored as v' + r.version);
@@ -574,11 +574,42 @@ document.getElementById('histrestore').onclick = async () => {
   } catch (e) { toast('Restore failed'); }
 };
 
-document.getElementById('download').onclick = () => {
-  window.location.href = state.historySha
-    ? '/raw-at/' + state.historySha + '/' + slug
-    : '/raw/' + slug;
-};
+/* ---------- command bar ---------- */
+
+function commands() {
+  const out = [];
+  const add = (group, title, run, extra) => out.push(Object.assign({group, title, run}, extra || {}));
+  if (!state.historySha) {
+    add('Actions', state.mode === 'comment' ? 'Stop commenting' : 'Comment on a component', () => setMode(state.mode === 'comment' ? 'interact' : 'comment'), {key: 'C', icon: 'comment'});
+    add('Actions', 'Note on this screen', openScreenNote, {key: 'N', icon: 'screen'});
+    add('Actions', 'General note', generalNote, {icon: 'edit'});
+    const c = rail.counts();
+    if (c.draft) add('Actions', 'Send ' + c.draft + ' to Claude', () => rail.send(), {key: MAC ? '⌘ ↵' : 'Ctrl ↵'});
+  } else {
+    add('Actions', 'Back to the live version', exitHistory, {icon: 'history'});
+  }
+  for (const d of Object.keys(DEVICES)) if (d !== state.device)
+    add('Actions', 'Show on ' + DEVICE_NAMES[d].toLowerCase(), () => setDevice(d, true), {icon: d === 'mobile' ? 'phone' : d});
+  add('Actions', (state.chrome ? 'Hide' : 'Show') + ' device chrome', () => setChrome(!state.chrome), {icon: 'phone'});
+  add('Actions', (state.showResolved ? 'Hide' : 'Show') + ' resolved pins', () => setShowResolved(!state.showResolved), {icon: 'comment'});
+  add('Actions', 'Reset the prototype', () => loadFrame(false), {icon: 'reset'});
+  add('Actions', 'Open in a new tab', () => window.open($('newtab').href, '_blank', 'noopener'), {icon: 'ext'});
+  if (state.proto && state.proto.meta.plan) add('Actions', 'Open the plan', () => { location.href = $('planLink').href; }, {icon: 'plan'});
+  add('Actions', 'Download this version', () => { location.href = $('dl').href; }, {icon: 'down'});
+  add('Actions', 'Switch to the ' + (theme() === 'dark' ? 'light' : 'dark') + ' theme', Studio.toggleTheme, {icon: theme() === 'dark' ? 'sun' : 'moon'});
+  state.screens.forEach(s => add('Screens', s.title, () => gotoScreen(s.id), {icon: 'screen'}));
+  if (!state.historySha) rail.items().forEach(i => add('Comments',
+    (i.kind === 'pin' ? '#' + pinNumber(i.id) + ' ' : '') + (i.quote || (i.kind === 'screen' ? 'Note on ' + (i.section || 'a screen') : 'General note')) + (i.comment ? ': ' + i.comment : ''),
+    () => { showPane('pane-comments'); showTab('comments'); rail.focusCard(i.id); if (i.anchor && i.anchor.screen) post({type: 'goto', route: i.anchor.route, screen: i.anchor.screen, focus: i.kind === 'pin' ? i.id : null}); },
+    {dot: i.status === 'answered' ? 'var(--red)' : i.status === 'resolved' ? 'var(--green)' : i.status === 'submitted' ? 'var(--blue)' : 'var(--amber)'}));
+  state.history.forEach((v, i) => add('Versions', vLabel(v) + ', ' + subjectTitle(v),
+    () => Studio.isLive(v, i, liveVersion()) ? exitHistory() : enterHistory(v.sha), {icon: 'history'}));
+  return out;
+}
+
+const pal = Studio.palette(commands);
+$('cmdk').onclick = pal.open;
+$('cmdkM').onclick = pal.open;
 
 /* ---------- boot ---------- */
 

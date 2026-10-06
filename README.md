@@ -5,7 +5,7 @@
 <p align="center"><b>Review Claude Code plans like a doc. Redline its prototypes like a design.</b><br>
 One Python file, zero dependencies, runs on your machine. <a href="https://redline.algofunds.in">redline.algofunds.in</a></p>
 
-![Redline plan viewer: the demo plan with mermaid diagrams, and the review rail with a thread that needs a reply, a draft comment and a suggested edit](docs/assets/plan-viewer.png)
+![Redline plan viewer: the outline and versions on the left, the demo plan with line numbers, a table and phase checklists in the middle, and the review panel with a thread that needs a reply, a draft comment and a suggested edit](docs/assets/plan-viewer.png)
 
 ## The problem
 
@@ -19,11 +19,12 @@ Redline moves both into the browser and sends your feedback straight back to the
 - **Review like a doc, not a diff.** Select any sentence and leave a comment or a suggested edit. Attach screenshots. When Claude has an open question, it becomes a red "Needs your reply" thread on the exact passage.
 - **Comments point at one exact place.** Each comment records the source lines and character offsets it was made on, plus a readable path like `Phase 2 › item 2`, while the markdown stays untouched. Repeated phrases never get mixed up, selections across bold, code and links highlight cleanly, and long selections reach Claude as a short `head … tail` quote plus the line numbers.
 - **An async loop.** Batch your notes and press "Send to Claude". The session picks them up through an inbox watcher without dropping what it was doing, edits the plan and bumps the version; the page updates live. "Run independently" hands the batch to a background agent so the main session's context stays clean.
-- **Plans that live on.** Every version is kept: the dropdown loads any past version, restores it or downloads it as `.md`. Plans survive `/clear`, compaction and restarts, and double as a progress board while Claude implements.
+- **Plans that live on.** Every version is kept: the version menu and the History tab load any past version, highlight what changed since the previous one, restore it or download it as `.md`. Plans survive `/clear`, compaction and restarts, and double as a progress board while Claude implements.
+- **A workspace, not a page.** An outline with comment counts per section, source line numbers, an overview ruler of every comment, and a command bar (`⌘K`) to jump to any section, comment, screen or version. Dark and light themes, and a phone layout.
 
 ## Prototypes
 
-![Redline prototype review: the Sprout demo app in a phone frame with three numbered pins, and the review rail listing a comment, a copy edit and an area note](docs/assets/prototype.png)
+![Redline prototype review: the screens list on the left, the Sprout demo app in a phone frame with numbered pins, and the review panel listing a comment, a copy edit and an area note](docs/assets/prototype.png)
 
 - **Playable, not a picture.** Ask for a prototype and Claude builds a clickable dummy of any app or website: real screens, fake data, every button does something. Redline shows it in a phone, tablet or desktop frame.
 - **Comment on the component.** Press `C` and click anything to pin a comment, or a "Suggest copy" edit for text. Drag a box to comment on an area; hold `Alt` for the exact element. Every pin records the screen, the component id and a screenshot of what you saw.
@@ -125,7 +126,8 @@ What Claude follows when it builds a prototype (full text in `skills/redline/SKI
 server.py        http server: plans, prototypes, feedback, submit, inbox signals (stdlib only)
 viewer.html      plan review page: rendering, selection toolbar, history
 prototype.html   prototype review page: device stage, Comment mode, pins
-static/          rail.js and redline.css (review rail shared by both pages),
+static/          studio.css and studio.js (the design system and page kit), rail.js (review
+                 panel shared by both pages), anchors.js (plan comment anchors), Geist fonts,
                  bridge.js (injected into prototypes), kit.js (optional prototype helpers)
 skills/redline/  the Claude Code skill (SKILL.md) and redline.sh, the launcher
 .claude-plugin/  plugin manifest (listed in the NikkyAmresh/claude-plugins marketplace)

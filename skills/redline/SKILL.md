@@ -118,7 +118,7 @@ When the user approves, implement phase by phase and keep the plan current: tick
 
 ## 6. Seeing older versions
 
-The page itself has a version dropdown in the header (next to the title): switching it loads any past commit read-only, with a "Restore this version" button (commits the old content back as a new version, nothing destructive) and a "↓ .md" download button (works on the live version or whichever historical one is selected) for handing someone a plain file without needing git. Point the user at that dropdown instead of asking them to run git.
+The page itself has a version menu in the header (the `v<N>` pill next to the title), a Versions list in the left pane and a History tab: picking a version loads that commit read-only, with a "Restore this version" button (commits the old content back as a new version, nothing destructive), and the download button in the header (`.md`) works on the live version or whichever historical one is shown, for handing someone a plain file without needing git. "Changes since v<N-1>" highlights what the latest version changed. Point the user at these instead of asking them to run git.
 
 For your own lookups, every bump is a commit, so history is plain git on the nested plans repo:
 

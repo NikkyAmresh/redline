@@ -34,7 +34,7 @@ except ImportError:  # Windows: no single-instance lock, everything else works
     fcntl = None
 
 APP = "redline"
-VERSION = "1.2.0"
+VERSION = "1.3.0"
 DEFAULT_PORT = 4747
 PORT_SPAN = 20  # try DEFAULT_PORT..DEFAULT_PORT+20 when a port is taken
 
@@ -401,21 +401,33 @@ def doc_git_path(slug):
 
 
 def plan_history(slug):
+    """Commits for a plan or prototype, newest first, each with the version
+    from its subject and the lines it added and removed."""
     path = doc_git_path(slug)
     follow = ["--follow"] if path.endswith(".md") else []  # --follow takes one file
-    out = git(*(["log"] + follow + ["--format=%H%x1f%h%x1f%ad%x1f%s",
+    out = git(*(["log"] + follow + ["--numstat", "--format=%x1e%H%x1f%h%x1f%ad%x1f%s",
                "--date=format:%Y-%m-%d %H:%M", "--", path]))
     if not out:
         return []
     commits = []
-    for line in out.strip("\n").split("\n"):
-        parts = line.split("\x1f")
+    for rec in out.split("\x1e"):
+        rec = rec.strip("\n")
+        if not rec:
+            continue
+        head, _, rest = rec.partition("\n")
+        parts = head.split("\x1f")
         if len(parts) != 4:
             continue
         full, short, date, subject = parts
+        adds = dels = 0
+        for line in rest.splitlines():
+            cols = line.split("\t")
+            if len(cols) >= 3 and cols[0].isdigit() and cols[1].isdigit():
+                adds += int(cols[0])
+                dels += int(cols[1])
         m = VERSION_IN_SUBJECT.search(subject)
-        commits.append({"sha": full, "short": short, "date": date,
-                        "subject": subject, "version": m.group(1) if m else None})
+        commits.append({"sha": full, "short": short, "date": date, "subject": subject,
+                        "version": m.group(1) if m else None, "adds": adds, "dels": dels})
     return commits
 
 
@@ -531,69 +543,56 @@ def list_plans():
 
 
 INDEX_TEMPLATE = """<!doctype html>
-<html><head><meta charset="utf-8">
+<html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Redline · plans</title>
-<style>
-:root {{
-  --paper:#faf8f3; --surface:#fff; --ink:#22252e; --muted:#6c7180;
-  --accent:#b45309; --line:#e5e1d8;
-}}
-@media (prefers-color-scheme: dark) {{
-  :root {{ --paper:#14161c; --surface:#1c1f27; --ink:#e8e6e1; --muted:#9aa0ad;
-          --accent:#f59e0b; --line:#2a2e38; }}
-}}
-* {{ box-sizing:border-box; margin:0; }}
-body {{ background:var(--paper); color:var(--ink);
-       font:16px/1.6 Charter, Georgia, serif; padding:48px 24px; }}
-main {{ max-width:720px; margin:0 auto; }}
-h1 {{ font-size:28px; margin-bottom:4px; }}
-.sub {{ color:var(--muted); font:12px ui-monospace, Menlo, monospace;
-        text-transform:uppercase; letter-spacing:.08em; margin-bottom:32px; }}
-a.card {{ display:block; background:var(--surface); border:1px solid var(--line);
-          border-radius:10px; padding:18px 20px; margin-bottom:12px;
-          text-decoration:none; color:inherit; }}
-a.card:hover {{ border-color:var(--accent); }}
-.trow {{ display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }}
-.t {{ font-size:19px; }}
-.chip {{ flex:none; font:11px ui-monospace, Menlo, monospace; text-transform:uppercase;
-         letter-spacing:.06em; padding:2px 10px; border-radius:999px;
-         border:1px solid currentColor; white-space:nowrap;
-         background:color-mix(in srgb, currentColor 12%, transparent); }}
-.chip.ok {{ color:#15803d; }}
-.chip.rev {{ color:#b45309; }}
-.chip.dr {{ color:var(--muted); }}
-.chip.info {{ color:var(--accent); }}
-@media (prefers-color-scheme: dark) {{
-  .chip.ok {{ color:#4ade80; }}
-  .chip.rev {{ color:#fbbf24; }}
-}}
-.meta {{ color:var(--muted); font:12px ui-monospace, Menlo, monospace; margin-top:6px; }}
-.need {{ color:#dc2626; font-weight:600; }}
-@media (prefers-color-scheme: dark) {{ .need {{ color:#f87171; }} }}
-.empty {{ color:var(--muted); font-style:italic; }}
-h2.ws {{ font:13px ui-monospace, Menlo, monospace; text-transform:uppercase;
-         letter-spacing:.08em; color:var(--accent); margin:28px 0 10px;
-         padding-bottom:6px; border-bottom:1px solid var(--line); }}
-.tl {{ display:flex; align-items:flex-start; gap:10px; min-width:0; flex:1; }}
-.tl .t {{ padding-top:1px; }}
-.trow .chip {{ margin-top:4px; }}
-.kind {{ flex:none; width:30px; height:30px; border-radius:8px; display:grid; place-items:center;
-         color:var(--accent); background:color-mix(in srgb, var(--accent) 12%, transparent); }}
-.kind svg {{ width:17px; height:17px; }}
-</style></head><body><main>
-<h1>Redline</h1>
-<div class="sub">plans and prototypes, port {port}</div>
-{rows}
-</main></body></html>"""
-
-
-PLAN_ICON = ('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" '
-             'stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l5 5v13H7z"/>'
-             '<path d="M14 3v5h5M10 13h6M10 17h6"/></svg>')
-PROTO_ICON = ('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" '
-              'stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2.5" width="12" '
-              'height="19" rx="2.5"/><path d="M10.5 18.5h3"/><path d="M9 7h6M9 10.5h4"/></svg>')
+<title>Redline</title>
+<script src="/static/studio.js"></script>
+<link rel="icon" href="/static/mark.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/static/studio.css">
+</head><body class="index-page">
+<header class="top">
+  <a class="brand" href="/" aria-label="Redline home"><svg><use href="#mark"/></svg><span>Redline</span></a>
+  <div class="ctx"><span class="vsep"></span><span class="crumbs"><span class="cur">Plans and prototypes</span></span></div>
+  <div class="tools">
+    <button class="hbtn" data-theme-toggle></button>
+    <span class="live on" id="live" title="{url}"><i></i><span id="livetext">Port {port}</span></span>
+  </div>
+</header>
+<main class="index-main">
+  <div class="index-head">
+    <div><h1>Reviews</h1><p>{summary}</p></div>
+    <span class="sp"></span>
+    {filter}
+  </div>
+  {rows}
+  <div class="nomatch" id="nomatch" hidden>Nothing matches.</div>
+</main>
+<script>
+(function () {{
+  const box = document.getElementById('q');
+  if (!box) return;
+  const run = () => {{
+    const words = box.value.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+    let shown = 0;
+    document.querySelectorAll('.wsg').forEach(g => {{
+      let n = 0;
+      g.querySelectorAll('.drow').forEach(r => {{
+        const hit = words.every(w => r.dataset.q.includes(w));
+        r.hidden = !hit;
+        if (hit) n++;
+      }});
+      g.hidden = !n;
+      shown += n;
+    }});
+    document.getElementById('nomatch').hidden = shown > 0;
+  }};
+  box.addEventListener('input', run);
+  document.addEventListener('keydown', e => {{
+    if (e.key === '/' && document.activeElement !== box) {{ e.preventDefault(); box.focus(); }}
+  }});
+}})();
+</script>
+</body></html>"""
 
 
 def status_class(status):
@@ -609,39 +608,65 @@ def status_class(status):
 
 def render_index(port):
     plans = list_plans()
+    esc = html.escape
+    filt = ""
     if not plans:
-        rows = '<p class="empty">No plans yet. Claude will write the first one to plans/&lt;workspace&gt;/.</p>'
+        summary = "Nothing to review yet."
+        rows = ('<div class="index-empty"><b>No plans yet</b>Ask Claude to plan something; '
+                'it writes the plan to <code>plans/&lt;workspace&gt;/</code> and it shows up here.</div>')
     else:
+        n_plans = sum(1 for p in plans if p["kind"] == "plan")
+        n_protos = len(plans) - n_plans
+        need = sum(p["counts"].get("answered", 0) for p in plans)
+        bits = ["%d plan%s" % (n_plans, "" if n_plans == 1 else "s")]
+        if n_protos:
+            bits.append("%d prototype%s" % (n_protos, "" if n_protos == 1 else "s"))
+        if need:
+            bits.append('<span class="need">%d waiting on your reply</span>' % need)
+        summary = ", ".join(bits)
+        filt = ('<label class="filter"><svg class="i s14"><use href="#i-search"/></svg>'
+                '<input id="q" placeholder="Filter" autocomplete="off" aria-label="Filter">'
+                '<kbd>/</kbd></label>')
         groups = {}
         for p in plans:
             groups.setdefault(p["workspace"], []).append(p)
-        esc = html.escape
         rows = ""
         for ws, items in groups.items():
-            rows += '<h2 class="ws">%s</h2>' % esc(ws or "ungrouped")
+            rows += ('<section class="wsg"><div class="wsg-h"><svg class="i s14"><use href="#i-folder"/></svg>'
+                     '<span>%s</span><span class="n">%d</span></div><div class="docs">'
+                     % (esc(ws or "ungrouped"), len(items)))
             for p in items:
                 c = p["counts"]
-                fb = "%d draft, %d waiting, %d resolved" % (c["draft"], c["submitted"], c["resolved"])
-                if c.get("answered"):
-                    fb = ('<span class="need">%d awaiting your reply</span> &middot; '
-                          % c["answered"]) + fb
                 proto = p["kind"] == "prototype"
-                kind = ('<span class="kind" title="Prototype">%s</span>' % PROTO_ICON) if proto \
-                    else ('<span class="kind" title="Plan">%s</span>' % PLAN_ICON)
-                extra = ""
+                meta = ['<span class="v">v%s</span>' % esc(p["version"])]
                 if proto:
-                    extra = "prototype &middot; %d screen%s &middot; " % (
-                        p["screens"], "" if p["screens"] == 1 else "s")
+                    meta.append("prototype, %d screen%s" % (p["screens"], "" if p["screens"] == 1 else "s"))
+                if p["updated"]:
+                    meta.append("updated %s" % esc(p["updated"]))
+                badges = ""
+                if c.get("answered"):
+                    badges += '<span class="badge b-reply" title="Waiting on your reply">%d</span>' % c["answered"]
+                if c.get("draft"):
+                    badges += '<span class="badge b-draft" title="Drafts not sent yet">%d</span>' % c["draft"]
+                if c.get("submitted"):
+                    badges += '<span class="badge b-waiting" title="Waiting for Claude">%d</span>' % c["submitted"]
+                if c.get("resolved"):
+                    badges += '<span class="badge b-resolved" title="Resolved">%d</span>' % c["resolved"]
                 rows += (
-                    '<a class="card" href="/%s/%s">'
-                    '<div class="trow"><div class="tl">%s<div class="t">%s</div></div>'
-                    '<span class="chip %s">%s</span></div>'
-                    '<div class="meta">%sv%s &middot; updated %s &middot; %s</div></a>'
-                    % ("proto" if proto else "plan", esc(p["slug"]), kind, esc(p["title"]),
-                       status_class(p["status"]), esc(p["status"]), extra,
-                       esc(p["version"]), esc(p["updated"]), fb)
+                    '<a class="drow" href="/%s/%s" data-q="%s">'
+                    '<span class="ic%s"><svg class="i"><use href="#i-%s"/></svg></span>'
+                    '<span class="t">%s</span><span class="m">%s</span>'
+                    '<span class="r">%s<span class="st %s">%s</span></span></a>'
+                    % ("proto" if proto else "plan", esc(p["slug"]),
+                       esc(re.sub(r"[^a-z0-9]+", " ", (p["title"] + " " + p["slug"] + " " + p["status"]
+                                                    + (" prototype" if proto else " plan")).lower())),
+                       " proto" if proto else "", "proto" if proto else "plan",
+                       esc(p["title"]), "".join("<span>%s</span>" % m for m in meta),
+                       badges, status_class(p["status"]), esc(p["status"]))
                 )
-    return INDEX_TEMPLATE.format(port=port, rows=rows)
+            rows += "</div></section>"
+    return INDEX_TEMPLATE.format(port=port, url="http://127.0.0.1:%d" % port, summary=summary,
+                                 filter=filt, rows=rows)
 
 
 SANDBOX = "allow-scripts allow-forms allow-modals allow-popups allow-downloads"
@@ -1288,25 +1313,42 @@ def detach(url):
     return True
 
 
-def stop_server():
+def stop_server(out=sys.stdout):
     url = running_url(wait=1.0)
     if not url:
-        print("Redline is not running (data: %s)" % DATA)
+        print("Redline is not running (data: %s)" % DATA, file=out)
         return 0
     pid = (read_runtime() or {}).get("pid")
     if not pid:
-        print("Redline is running at %s but its pid is unknown" % url)
+        print("Redline is running at %s but its pid is unknown" % url, file=out)
         return 1
     os.kill(pid, signal.SIGTERM)
     for _ in range(50):
         lock = take_lock()
         if lock is not None:
             lock.close()
-            print("Redline stopped")
+            print("Redline stopped", file=out)
             return 0
         time.sleep(0.1)
-    print("Redline (pid %s) did not stop" % pid)
+    print("Redline (pid %s) did not stop" % pid, file=out)
     return 1
+
+
+def version_key(v):
+    try:
+        return tuple(int(x) for x in str(v).split("."))
+    except ValueError:
+        return ()
+
+
+def older_running(url):
+    """The version of the Redline at url when it is older than this file,
+    as after a plugin update: the old server would keep serving the old
+    pages, so a start replaces it. None otherwise."""
+    h = identify(url)
+    if h and version_key(h.get("version", "")) < version_key(VERSION):
+        return h.get("version") or "unknown"
+    return None
 
 
 def _terminate(signum, frame):
@@ -1339,6 +1381,12 @@ def main():
         return 0 if url else 1
 
     url = running_url()
+    old = url and older_running(url)
+    if old:
+        # stdout may be parsed (--url), so the note goes to stderr
+        print("Redline %s is running; replacing it with %s" % (old, VERSION), file=sys.stderr)
+        if stop_server(out=sys.stderr) == 0:
+            url = None
     lock = None
     if not url:
         lock = take_lock()

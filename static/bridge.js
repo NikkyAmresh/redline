@@ -570,9 +570,13 @@ function release(x, y, alt) {
 
 function onKey(e) {
   const t = e.target;
-  if (t && (t.isContentEditable || (t.matches && t.matches('input, textarea, select')))) return;
-  if (e.metaKey || e.ctrlKey || e.altKey) return;
-  if (e.key === 'c' || e.key === 'C' || e.key === 'Escape') send('key', {key: e.key === 'C' ? 'c' : e.key});
+  const typing = t && (t.isContentEditable || (t.matches && t.matches('input, textarea, select')));
+  const mod = e.metaKey || e.ctrlKey;
+  // the shell's command bar opens from inside the prototype too
+  if (mod && !e.altKey && (e.key === 'k' || e.key === 'K')) { e.preventDefault(); send('key', {key: 'palette'}); return; }
+  if (typing || mod || e.altKey) return;
+  const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+  if (k === 'c' || k === 'n' || k === 'Escape') send('key', {key: k});
 }
 
 /* ---------- wiring ---------- */

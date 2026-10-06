@@ -375,5 +375,6 @@ function reveal(docEl, id) {
   return true;
 }
 
-window.RedlineAnchors = {render, capture, resolve, paint, clear, reveal, where};
+window.RedlineAnchors = {render, capture, resolve, paint, clear, reveal, where,
+                          rangeOf: id => ranges.get(id) || null};
 })();

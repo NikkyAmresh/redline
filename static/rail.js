@@ -1,7 +1,8 @@
-/* Redline review rail, shared by the plan viewer and the prototype shell:
-   drafts, Send to Claude, threads and replies, screenshot attachments and
-   the comment popover. Pages own what is being reviewed; the rail owns the
-   feedback. */
+/* Redline review panel, shared by the plan page and the prototype page:
+   comment cards (drafts, waiting, needs your reply, resolved), threads and
+   replies, screenshot attachments, the comment form, and the footer with
+   Run independently and Send to Claude. Pages own what is being reviewed;
+   the panel owns the feedback. */
 (function () {
 'use strict';
 
@@ -21,6 +22,7 @@ function toast(msg) {
   if (!t) {
     t = document.createElement('div');
     t.id = 'toast';
+    t.setAttribute('role', 'status');
     document.body.appendChild(t);
   }
   t.textContent = msg; t.classList.add('show');
@@ -34,53 +36,70 @@ function imageFiles(dt) {
   return out;
 }
 
+const MAC = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+const MOD = MAC ? '<kbd class="g">⌘</kbd>' : '<kbd>Ctrl</kbd>';
+const ENTER = '<kbd class="g">↵</kbd>';
+const I = {
+  x: '<svg class="i s14" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+  check: '<svg class="i s14" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+  note: '<svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
+};
+
 function thumbRow(urls) {
   return '<div class="thumbs">' + urls.map(u =>
-    '<span class="tw"><img src="' + esc(u) + '"></span>').join('') + '</div>';
+    '<span class="tw"><img src="' + esc(u) + '" alt="Attached screenshot"></span>').join('') + '</div>';
 }
-
-const RAIL_HTML =
-  '<h2>Review</h2><div id="hint"></div><div class="rail-actions"></div>' +
-  '<label class="switch" title="Claude hands this batch to a background agent and keeps its own task going, instead of fixing everything in the main context">' +
-  '<input type="checkbox" id="bgmode"><span class="track"></span>Run independently (background agent)</label>' +
-  '<button class="primary" id="submit" disabled>Send to Claude</button><div id="items"></div>';
 
 const POPOVER_HTML =
   '<div class="quote" id="p-quote"></div><div class="where" id="p-where"></div>' +
   '<div class="kinds" id="p-kinds"></div>' +
-  '<div id="p-editwrap" hidden><label>Proposed replacement</label>' +
+  '<div id="p-editwrap" hidden><label for="p-replace">Proposed replacement</label>' +
   '<textarea id="p-replace" class="mono"></textarea></div>' +
-  '<label id="p-notelabel">Comment</label>' +
+  '<label id="p-notelabel" for="p-note">Comment</label>' +
   '<textarea id="p-note" placeholder="What should change, or what do you want to know?"></textarea>' +
   '<div class="thumbs" id="p-imgs"></div>' +
   '<div class="imghint">Paste or drop screenshots to attach</div>' +
-  '<div class="row"><button class="ghost" id="p-cancel">Cancel</button>' +
-  '<button class="primary" id="p-save">Save draft</button></div>';
+  '<div class="row"><span class="hintk">' + MOD + ENTER + ' to save</span>' +
+  '<button class="btn-ghost" id="p-cancel">Cancel</button>' +
+  '<button class="btn-sm solo" id="p-save">Save draft</button></div>';
 
-/* opts: slug, rail (element), hint (html), actions [{label, title, onClick}],
-   decorate(item) -> {num, chip, where}, onCardClick(item), refresh() */
+/* opts:
+     slug
+     list      element for the comment cards
+     footer    element for Run independently, note actions and Send
+     hint      html shown when there is no feedback yet
+     actions   [{label, title, key, onClick}] note buttons in the footer
+     decorate  (item) -> {num, chip, where} extra card details
+     onCardClick(item, cardEl), onRender(items), refresh() */
 function mount(opts) {
   const slug = opts.slug;
-  const rail = opts.rail;
-  rail.innerHTML = RAIL_HTML;
-  const hint = rail.querySelector('#hint');
-  hint.innerHTML = opts.hint || '';
-  const actions = rail.querySelector('.rail-actions');
+  const list = opts.list;
+  const footer = opts.footer;
+
+  footer.innerHTML =
+    '<div class="agent-row" role="switch" tabindex="0" aria-checked="false" id="bgmode" ' +
+    'title="Claude hands this batch to a background agent and keeps its own task going">' +
+    '<span class="switch" aria-hidden="true"></span>Run independently<span class="sub">background agent</span></div>' +
+    ((opts.actions || []).length > 1 ? '<div class="note-row"></div>' : '') +
+    '<div class="frow"><button class="send" id="submit" disabled><span class="lbl">Send to Claude</span>' +
+    '<span class="kbds">' + MOD + ENTER + '</span></button></div>';
+  const frow = footer.querySelector('.frow');
+  const noteRow = footer.querySelector('.note-row');
   for (const a of opts.actions || []) {
     const b = document.createElement('button');
-    b.className = 'ghost';
-    b.textContent = a.label;
+    b.className = 'note-btn';
+    b.innerHTML = I.note + '<span>' + esc(a.label) + '</span>' + (a.key ? '<kbd>' + esc(a.key) + '</kbd>' : '');
     if (a.title) b.title = a.title;
     b.onclick = a.onClick;
-    actions.appendChild(b);
+    if (noteRow) noteRow.appendChild(b); else frow.insertBefore(b, frow.firstChild);
   }
-  const itemsEl = rail.querySelector('#items');
-  const submitBtn = rail.querySelector('#submit');
-  const bgmode = rail.querySelector('#bgmode');
+  const submitBtn = footer.querySelector('#submit');
+  const bgmode = footer.querySelector('#bgmode');
 
   const popover = document.createElement('div');
   popover.id = 'popover';
   popover.hidden = true;
+  popover.setAttribute('role', 'dialog');
   popover.innerHTML = POPOVER_HTML;
   document.body.appendChild(popover);
   const $ = id => popover.querySelector('#' + id);
@@ -89,7 +108,7 @@ function mount(opts) {
   const st = { fb:{items:[]}, fbRaw:'', form:null, images:[], pending:[], replyImgs:{} };
   const refresh = () => opts.refresh && opts.refresh();
 
-  /* ---------- feedback list ---------- */
+  /* ---------- the comment list ---------- */
 
   function setFeedback(fb) {
     const raw = JSON.stringify(fb);
@@ -99,68 +118,96 @@ function mount(opts) {
     return true;
   }
 
+  function counts() {
+    const c = {draft:0, submitted:0, answered:0, resolved:0};
+    for (const i of st.fb.items) c[i.status] = (c[i.status] || 0) + 1;
+    c.total = st.fb.items.length;
+    return c;
+  }
+
   function render() {
     const groups = {draft:[], submitted:[], answered:[], resolved:[]};
     for (const i of st.fb.items) (groups[i.status] || groups.draft).push(i);
     let html = '';
-    const section = (label, arr, cls) => {
+    const section = (label, arr, note) => {
       if (!arr.length) return;
-      html += '<h2 class="' + (cls || '') + '">' + label + '</h2>';
+      html += '<div class="grp"><span>' + label + '</span><span class="n">' + arr.length + '</span>'
+            + (note ? '<span class="note">' + note + '</span>' : '') + '</div><div class="cards">';
       for (const i of arr) html += itemCard(i);
+      html += '</div>';
     };
-    section('Needs your reply', groups.answered, 'attn');
-    section('Drafts', groups.draft);
+    section('Needs your reply', groups.answered);
+    section('Drafts', groups.draft, 'Not sent yet');
     section('Waiting for Claude', groups.submitted);
     section('Resolved', groups.resolved.slice().reverse());
-    itemsEl.innerHTML = html;
-    hint.style.display = st.fb.items.length ? 'none' : '';
+    list.innerHTML = html || '<div class="ihint">' + (opts.hint || '') + '</div>';
     const n = groups.draft.length;
     submitBtn.disabled = !n;
-    submitBtn.textContent = n ? 'Send ' + n + ' to Claude' : 'Send to Claude';
+    submitBtn.querySelector('.lbl').textContent = n ? 'Send ' + n + ' to Claude' : 'Send to Claude';
+    if (opts.onRender) opts.onRender(st.fb.items);
+  }
+
+  function typeLabel(i) {
+    if (i.kind === 'screen') return 'Screen note';
+    if (!i.quote && !i.anchor) return 'General note';
+    return i.type === 'edit' ? 'Suggested edit' : 'Comment';
   }
 
   function itemCard(i) {
     const d = (opts.decorate && opts.decorate(i)) || {};
-    const answered = i.status === 'answered';
-    let h = '<div class="item' + (answered ? ' answered' : '') + '" data-id="' + esc(i.id) + '"><div class="head">';
-    if (d.num) h += '<span class="num ' + (i.status === 'resolved' ? 'resolved' : answered ? 'answered' : '')
-                  + '">' + d.num + '</span>';
-    const chip = i.status === 'resolved' ? ['resolved', 'resolved']
-               : answered ? ['answered', 'needs reply']
-               : [esc(i.type), i.type === 'edit' ? 'edit' : 'comment'];
-    h += '<span class="chip ' + chip[0] + '">' + chip[1] + '</span>';
+    const s = i.status;
+    const cls = s === 'answered' ? 'st-reply' : s === 'resolved' ? 'st-resolved' : s === 'submitted' ? 'st-waiting' : 'st-draft';
+    const kind = typeLabel(i);
+    const head = s === 'answered' ? 'Claude asked you' : s === 'submitted' ? 'Waiting for Claude'
+               : s === 'resolved' ? 'Resolved' : kind;
+    let h = '<article class="card ' + cls + '" data-id="' + esc(i.id) + '" tabindex="0"><div class="ch">';
+    h += d.num ? '<span class="num">' + d.num + '</span>' : '<span class="dot"></span>';
+    h += '<span class="ty">' + head + (head !== kind ? ' <span class="k">· ' + kind.toLowerCase() + '</span>' : '') + '</span>';
     if (d.chip) h += d.chip;
-    if (i.section) h += '<span class="sec">' + esc(i.section) + '</span>';
-    if (i.status === 'draft')
-      h += '<button class="rm" title="Remove draft" data-rm="' + esc(i.id) + '">&times;</button>';
+    if (s === 'draft')
+      h += '<span class="acts"><button title="Remove draft" aria-label="Remove draft" data-rm="' + esc(i.id) + '">' + I.x + '</button></span>';
     h += '</div>';
-    if (d.where) h += '<div class="where">' + esc(d.where) + '</div>';
-    if (i.quote) h += '<div class="quote">&ldquo;' + esc(i.quote) + '&rdquo;</div>';
-    if (i.comment) h += '<div class="body">' + esc(i.comment) + '</div>';
-    if (i.type === 'edit' && i.suggested_text)
-      h += '<div class="prop">' + esc(i.suggested_text) + '</div>';
-    if (i.images) h += thumbRow(i.images);
-    if (i.status === 'resolved' && i.resolution) {
-      h += '<div class="res"><span class="who">Resolved</span>' + esc(i.resolution) + '</div>';
+    // where it is: the plan anchor, or what the page tells us
+    const a = i.anchor || {};
+    let loc = '';
+    if (a.lines) loc = esc(a.where || i.section || '') + ' · <span class="ln">line ' + esc(a.lines) + '</span>';
+    else if (d.where) loc = (i.section ? esc(i.section) + ' · ' : '') + '<span class="ln">' + esc(d.where) + '</span>';
+    else if (i.section) loc = esc(i.section);
+    if (loc) h += '<div class="loc">' + loc + '</div>';
+    if (i.type === 'edit' && i.suggested_text) {
+      h += '<div class="diff"><div class="m"><span class="sg">-</span><span>' + esc(i.quote) + '</span></div>'
+         + '<div class="p"><span class="sg">+</span><span>' + esc(i.suggested_text) + '</span></div></div>';
+      if (i.comment && s !== 'answered') h += '<div class="why"><span>Why: </span>' + esc(i.comment) + '</div>';
+    } else if (i.quote) {
+      h += '<div class="q">' + esc(i.quote) + '</div>';
+    }
+    if (i.images && s !== 'resolved') h += thumbRow(i.images);
+    if (s === 'resolved') {
+      if (i.resolution) h += '<div class="resn">' + I.check + '<span>' + esc(i.resolution) + '</span></div>';
     } else {
       const thread = (i.reply ? [{who:'claude', text:i.reply}] : []).concat(i.thread || []);
-      for (const m of thread) {
-        h += '<div class="msg"><span class="who' + (m.who === 'user' ? ' user' : '') + '">'
-           + (m.who === 'user' ? 'You' : 'Claude') + '</span>' + esc(m.text);
-        if (m.images) h += thumbRow(m.images);
-        h += '</div>';
+      if (thread.length) {
+        const msgs = (i.comment && i.type !== 'edit' && !(thread[0].who === 'user' && thread[0].text === i.comment))
+          ? [{who:'user', text:i.comment}].concat(thread) : thread;
+        h += '<div class="thread">' + msgs.map(m =>
+          '<div class="msg"><span class="av ' + (m.who === 'user' ? 'av-you">Y' : 'av-claude">C') + '</span><div>'
+          + '<div class="who"><b>' + (m.who === 'user' ? 'You' : 'Claude') + '</b></div><p>' + esc(m.text) + '</p>'
+          + (m.images ? thumbRow(m.images) : '') + '</div></div>').join('') + '</div>';
+      } else if (i.comment && i.type !== 'edit') {
+        h += '<div class="body">' + esc(i.comment) + '</div>';
       }
     }
-    if (answered)
-      h += '<div class="replybox"><textarea placeholder="Answer Claude&hellip; (paste screenshots too)" data-reply="'
-         + esc(i.id) + '"></textarea><div class="thumbs" data-thumbs="' + esc(i.id) + '">'
-         + (st.replyImgs[i.id] || []).map(u => '<span class="tw"><img src="' + esc(u) + '"></span>').join('')
-         + '</div><button class="primary" data-send="' + esc(i.id) + '">Reply</button></div>';
-    return h + '</div>';
+    if (s === 'answered')
+      h += '<div class="reply"><textarea placeholder="Reply to Claude, paste screenshots too" data-reply="' + esc(i.id) + '"></textarea>'
+         + '<div class="thumbs" data-thumbs="' + esc(i.id) + '">'
+         + (st.replyImgs[i.id] || []).map(u => '<span class="tw"><img src="' + esc(u) + '"></span>').join('') + '</div>'
+         + '<div class="rf"><span>Sends to Claude now</span><span class="sp"></span>'
+         + '<button class="btn-sm" data-send="' + esc(i.id) + '">Reply <span class="kbds">' + MOD + ENTER + '</span></button></div></div>';
+    return h + '</article>';
   }
 
   function focusCard(id) {
-    const card = itemsEl.querySelector('.item[data-id="' + CSS.escape(id) + '"]');
+    const card = list.querySelector('.card[data-id="' + CSS.escape(id) + '"]');
     if (!card) return;
     card.scrollIntoView({block:'nearest', behavior:'smooth'});
     card.classList.add('focus');
@@ -185,7 +232,7 @@ function mount(opts) {
   function renderFormImgs() {
     $('p-imgs').innerHTML = st.images.map((im, i) =>
       '<span class="tw"><img src="' + esc(im.url) + '"' + (im.auto ? ' title="Captured automatically"' : '')
-      + '><button class="tx" data-imgrm="' + i + '">&times;</button></span>').join('')
+      + '><button class="tx" data-imgrm="' + i + '" aria-label="Remove">&times;</button></span>').join('')
       + st.pending.map(() => '<span class="tw loading">capturing</span>').join('');
     if (st.form) place(st.form.sel.rect, st.form.sel.place);  // it grew; stay on screen
   }
@@ -215,7 +262,7 @@ function mount(opts) {
   function stageReplyImages(id, files) {
     files.forEach(f => uploadImage(f).then(u => {
       (st.replyImgs[id] = st.replyImgs[id] || []).push(u);
-      const el = itemsEl.querySelector('[data-thumbs="' + CSS.escape(id) + '"]');
+      const el = list.querySelector('[data-thumbs="' + CSS.escape(id) + '"]');
       if (el) el.innerHTML = st.replyImgs[id].map(x =>
         '<span class="tw"><img src="' + esc(x) + '"></span>').join('');
     }, () => toast('Upload failed')));
@@ -238,18 +285,15 @@ function mount(opts) {
     e.preventDefault();
     imageFiles(e.dataTransfer).forEach(f => attachImage(uploadImage(f)));
   });
-  itemsEl.addEventListener('dragover', e => {
-    if (e.target.closest('.replybox')) e.preventDefault();
-  });
-  itemsEl.addEventListener('drop', e => {
-    const box = e.target.closest('.replybox');
+  list.addEventListener('dragover', e => { if (e.target.closest('.reply')) e.preventDefault(); });
+  list.addEventListener('drop', e => {
+    const box = e.target.closest('.reply');
     if (!box) return;
     e.preventDefault();
-    stageReplyImages(box.querySelector('textarea[data-reply]').dataset.reply,
-                     imageFiles(e.dataTransfer));
+    stageReplyImages(box.querySelector('textarea[data-reply]').dataset.reply, imageFiles(e.dataTransfer));
   });
 
-  /* ---------- comment popover ---------- */
+  /* ---------- the comment form ---------- */
 
   function setType(type) {
     const f = st.form;
@@ -257,32 +301,32 @@ function mount(opts) {
     $('p-editwrap').hidden = type !== 'edit';
     $('p-notelabel').textContent = type === 'edit' ? 'Why (optional)' : 'Comment';
     if (type === 'edit' && !$('p-replace').value) $('p-replace').value = f.sel.editText || '';
-    $('p-kinds').querySelectorAll('button').forEach(b =>
-      b.classList.toggle('on', b.dataset.kind === type));
+    $('p-kinds').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b.dataset.kind === type));
   }
 
   function place(rect, mode) {
     const w = popover.offsetWidth, h = popover.offsetHeight;
-    const minX = scrollX + 8, maxX = scrollX + innerWidth - w - 16;
+    const minX = scrollX + 8, maxX = scrollX + innerWidth - w - 12;
     let left, top;
     if (!rect) {
       left = Math.max(minX, (innerWidth - w) / 2 + scrollX);
-      top = scrollY + 140;
+      top = scrollY + Math.max(80, innerHeight * .18);
     } else if (mode === 'side') {
       left = rect.right + 14;
       top = rect.top;
       if (left > maxX) left = rect.left - w - 14;
       if (left < minX) { left = Math.max(minX, Math.min(rect.left, maxX)); top = rect.bottom + 10; }
-      top = Math.max(scrollY + 8, Math.min(top, scrollY + innerHeight - h - 12));
     } else {
       left = Math.max(minX, Math.min(rect.left, maxX));
       top = rect.bottom + 10;
+      if (top + h > scrollY + innerHeight - 12) top = Math.max(scrollY + 8, rect.top - h - 10);
     }
+    top = Math.max(scrollY + 8, Math.min(top, scrollY + innerHeight - h - 12));
     popover.style.left = left + 'px';
     popover.style.top = top + 'px';
   }
 
-  /* sel: {label, where, editText, allowEdit, rect (page coords), place
+  /* sel: {label, where, editText, allowEdit, editLabel, rect (page coords), place
      ('below' or 'side'), extra (fields merged into the saved item), onClose} */
   function openForm(type, sel) {
     st.form = {type, sel};
@@ -291,7 +335,7 @@ function mount(opts) {
     $('p-quote').textContent = sel.label || '';
     $('p-where').textContent = sel.where || '';
     $('p-kinds').innerHTML = sel.allowEdit
-      ? '<button data-kind="comment">Comment</button><button data-kind="edit">Suggest copy</button>' : '';
+      ? '<span class="seg"><button data-kind="comment">Comment</button><button data-kind="edit">' + esc(sel.editLabel || 'Suggest copy') + '</button></span>' : '';
     $('p-replace').value = type === 'edit' ? (sel.editText || '') : '';
     $('p-note').value = '';
     setType(type);
@@ -318,6 +362,9 @@ function mount(opts) {
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape' && st.form) { closeForm(); e.stopImmediatePropagation(); }
   });
+  popover.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); e.stopPropagation(); $('p-save').click(); }
+  });
 
   $('p-save').onclick = async () => {
     const f = st.form;
@@ -325,12 +372,8 @@ function mount(opts) {
     const note = $('p-note').value.trim();
     const replace = $('p-replace').value;
     const own = st.images.some(im => !im.auto) || st.pending.length;
-    if (f.type === 'comment' && !note && !own) {
-      toast('Write a comment or attach a screenshot first'); return;
-    }
-    if (f.type === 'edit' && replace === (f.sel.editText || '') && !note && !own) {
-      toast('Change the text or add a note'); return;
-    }
+    if (f.type === 'comment' && !note && !own) { toast('Write a comment or attach a screenshot first'); return; }
+    if (f.type === 'edit' && replace === (f.sel.editText || '') && !note && !own) { toast('Change the text or add a note'); return; }
     if (st.pending.length) {  // let an in-flight capture land, but never hang on it
       $('p-save').disabled = true;
       await Promise.race([Promise.all(st.pending), new Promise(r => setTimeout(r, 4000))]);
@@ -348,62 +391,76 @@ function mount(opts) {
     } catch (e) { toast('Could not save: ' + e.message); }
   };
 
-  /* ---------- submit, replies, card clicks ---------- */
+  /* ---------- send, replies, card clicks ---------- */
 
-  bgmode.checked = localStorage.getItem('plan-bgmode') === '1';
-  bgmode.onchange = () => localStorage.setItem('plan-bgmode', bgmode.checked ? '1' : '0');
+  const setBg = on => bgmode.setAttribute('aria-checked', on ? 'true' : 'false');
+  setBg(localStorage.getItem('plan-bgmode') === '1');
+  bgmode.querySelector('.switch').setAttribute('aria-checked', bgmode.getAttribute('aria-checked'));
+  const toggleBg = () => {
+    const on = bgmode.getAttribute('aria-checked') !== 'true';
+    setBg(on);
+    bgmode.querySelector('.switch').setAttribute('aria-checked', on);
+    localStorage.setItem('plan-bgmode', on ? '1' : '0');
+  };
+  bgmode.onclick = toggleBg;
+  bgmode.onkeydown = e => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); toggleBg(); } };
+  const independent = () => bgmode.getAttribute('aria-checked') === 'true';
 
-  submitBtn.onclick = async () => {
+  async function send() {
+    if (submitBtn.disabled) { toast('No drafts to send'); return; }
     try {
-      const r = await api('/api/submit/' + slug, {independent: bgmode.checked});
-      toast('Sent ' + r.submitted + ' item' + (r.submitted === 1 ? '' : 's')
-            + ' to Claude. It is watching the inbox.');
+      const r = await api('/api/submit/' + slug, {independent: independent()});
+      toast('Sent ' + r.submitted + ' item' + (r.submitted === 1 ? '' : 's') + ' to Claude. It is watching the inbox.');
       refresh();
     } catch (e) { toast('Submit failed: ' + e.message); }
-  };
+  }
+  submitBtn.onclick = send;
 
-  itemsEl.addEventListener('click', async e => {
+  async function sendReply(id) {
+    const ta = list.querySelector('textarea[data-reply="' + CSS.escape(id) + '"]');
+    const text = ta ? ta.value.trim() : '';
+    if (!text && !(st.replyImgs[id] || []).length) { toast('Write a reply or attach a screenshot first'); return; }
+    try {
+      if (ta) ta.blur();
+      await api('/api/reply/' + slug, {id, text, images: st.replyImgs[id] || [], independent: independent()});
+      delete st.replyImgs[id];
+      toast('Reply sent to Claude');
+      refresh();
+    } catch (err) { toast('Could not send: ' + err.message); }
+  }
+
+  list.addEventListener('keydown', e => {
+    const ta = e.target.closest && e.target.closest('textarea[data-reply]');
+    if (ta && e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); e.stopPropagation(); sendReply(ta.dataset.reply); }
+    else if (e.key === 'Enter' && e.target.classList && e.target.classList.contains('card')) e.target.click();
+  });
+
+  list.addEventListener('click', async e => {
     const rm = e.target.closest('[data-rm]');
     if (rm) {
       await api('/api/feedback/' + slug + '/delete', {id: rm.dataset.rm});
       refresh();
       return;
     }
-    const send = e.target.closest('[data-send]');
-    if (send) {
-      const id = send.dataset.send;
-      const ta = itemsEl.querySelector('textarea[data-reply="' + CSS.escape(id) + '"]');
-      const text = ta ? ta.value.trim() : '';
-      if (!text && !(st.replyImgs[id] || []).length) {
-        toast('Write a reply or attach a screenshot first'); return;
-      }
-      try {
-        if (ta) ta.blur();
-        await api('/api/reply/' + slug, {id, text, images: st.replyImgs[id] || [],
-                                         independent: bgmode.checked});
-        delete st.replyImgs[id];
-        toast('Reply sent to Claude');
-        refresh();
-      } catch (err) { toast('Could not send: ' + err.message); }
-      return;
-    }
+    const sendBtn = e.target.closest('[data-send]');
+    if (sendBtn) { sendReply(sendBtn.dataset.send); return; }
     const img = e.target.closest('.thumbs img');
     if (img) { window.open(img.src); return; }
-    if (e.target.closest('.replybox')) return;
-    const card = e.target.closest('.item');
+    if (e.target.closest('.reply')) return;
+    const card = e.target.closest('.card');
     if (!card || !opts.onCardClick) return;
     const item = st.fb.items.find(i => i.id === card.dataset.id);
     if (item) opts.onCardClick(item, card);
   });
 
   return {
-    setFeedback, render, focusCard, openForm, closeForm, attachImage, uploadDataUrl,
+    setFeedback, render, focusCard, openForm, closeForm, attachImage, uploadDataUrl, send, counts,
     items: () => st.fb.items,
     isFormOpen: () => !!st.form,
     // a re-render would wipe a reply being typed; a focused button is fine
-    busy: () => !!st.form || !!(document.activeElement && itemsEl.contains(document.activeElement)
+    busy: () => !!st.form || !!(document.activeElement && list.contains(document.activeElement)
                                 && document.activeElement.matches('textarea')),
-    setDisabled: on => rail.classList.toggle('disabled', on),
+    setDisabled: on => { footer.hidden = on; list.classList.toggle('disabled', on); },
   };
 }
 

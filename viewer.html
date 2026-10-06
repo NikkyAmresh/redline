@@ -1,264 +1,569 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Redline</title>
-<link rel="stylesheet" href="/static/redline.css">
+<script src="/static/studio.js"></script>
+<link rel="icon" href="/static/mark.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/static/studio.css">
 <script src="/vendor/marked.min.js"></script>
 <script src="/vendor/mermaid.min.js"></script>
 <script src="/static/rail.js"></script>
 <script src="/static/anchors.js"></script>
-<style>
-html { scroll-behavior:smooth; }
-body {
-  background:var(--paper); color:var(--ink);
-  font:17px/1.65 Charter, Georgia, serif;
-}
-
-main { display:flex; gap:0; align-items:flex-start; }
-#doc {
-  flex:1; min-width:0; max-width:780px;
-  padding:40px 48px 120px; margin:0 auto;
-}
-#doc h1 { font-size:32px; line-height:1.2; margin:8px 0 16px; }
-#doc h2 { font-size:23px; margin:40px 0 12px; padding-top:8px; }
-#doc h3 { font-size:18px; margin:28px 0 8px; }
-#doc p, #doc ul, #doc ol { margin:0 0 14px; }
-#doc li { margin:4px 0; }
-#doc code {
-  font:.85em ui-monospace, "SF Mono", Menlo, monospace;
-  background:var(--accent-soft); padding:1px 5px; border-radius:4px;
-}
-#doc pre {
-  background:var(--surface); border:1px solid var(--line); border-radius:8px;
-  padding:14px 16px; overflow-x:auto; margin:0 0 16px;
-}
-#doc pre code { background:none; padding:0; }
-#doc table { border-collapse:collapse; margin:0 0 16px; width:100%; font-size:15px; }
-#doc th, #doc td { border:1px solid var(--line); padding:7px 11px; text-align:left; }
-#doc th { font-family:-apple-system, sans-serif; font-size:12px;
-          text-transform:uppercase; letter-spacing:.05em; color:var(--muted); }
-#doc blockquote { border-left:3px solid var(--accent); margin:0 0 14px;
-                  padding:2px 0 2px 16px; color:var(--muted); }
-#doc hr { border:0; border-top:1px solid var(--line); margin:32px 0; }
-#doc input[type=checkbox] { accent-color:var(--accent); margin-right:6px; }
-.mermaid-wrap { background:var(--surface); border:1px solid var(--line);
-                border-radius:8px; padding:18px; overflow-x:auto; margin:0 0 16px;
-                text-align:center; }
-.mermaid-wrap svg { max-width:100%; height:auto; }
-
-mark.fb { border-radius:3px; padding:0 1px; cursor:pointer;
-          background:var(--hl); color:inherit;
-          border-bottom:2px solid rgba(217,119,6,.75); }
-mark.fb.resolved { background:var(--hl-resolved);
-                   border-bottom-color:rgba(34,197,94,.6); }
-mark.fb.answered { background:var(--hl-answered);
-                   border-bottom-color:rgba(220,38,38,.7); }
-mark.fb.flash { outline:2px solid var(--accent); }
-/* comment highlights drawn without touching the DOM (CSS Custom Highlight
-   API), so they work across bold, code and links; mark.fb is the fallback */
-::highlight(rl-open) { background-color:var(--hl); text-decoration:underline 2px rgba(217,119,6,.75);
-                       text-underline-offset:3px; }
-::highlight(rl-answered) { background-color:var(--hl-answered); text-decoration:underline 2px rgba(220,38,38,.7);
-                           text-underline-offset:3px; }
-::highlight(rl-resolved) { background-color:var(--hl-resolved); text-decoration:underline 2px rgba(34,197,94,.6);
-                           text-underline-offset:3px; }
-::highlight(rl-flash) { background-color:rgba(245,158,11,.5); }
-
-#seltool {
-  position:absolute; z-index:30; display:flex; gap:1px;
-  background:var(--ink); border-radius:8px; box-shadow:var(--shadow);
-  overflow:hidden;
-}
-#seltool button {
-  background:none; border:0; color:var(--paper); padding:8px 13px;
-  font:13px -apple-system, sans-serif; cursor:pointer;
-  display:flex; align-items:center; gap:6px;
-}
-#seltool button svg { width:14px; height:14px; }
-#seltool button:hover { background:rgba(255,255,255,.14); }
-
-@media (max-width: 980px) {
-  main { flex-direction:column; }
-  #doc { padding:24px 20px 60px; }
-}
-@media (prefers-reduced-motion: reduce) { html { scroll-behavior:auto; } }
-</style>
 </head>
 <body>
-
-<header>
-  <a href="/">Redline</a><span style="color:var(--muted)">/</span>
-  <span id="title">&hellip;</span>
-  <select class="pill version" id="version"><option value="__live__" selected>v&hellip; (live)</option></select>
-  <span class="pill" id="pstatus"></span>
-  <a class="pill" id="protolink" hidden title="Open the prototype for this plan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M10.5 18.5h3"/></svg>prototype</a>
-  <button class="pill" id="download" title="Download this version as a .md file">&#8595; .md</button>
-  <span id="live"><span class="dot"></span><span id="livetext">connecting</span></span>
+<header class="top">
+  <a class="brand" href="/" aria-label="Redline home"><svg><use href="#mark"/></svg><span>Redline</span></a>
+  <div class="ctx">
+    <span class="vsep"></span>
+    <nav class="crumbs" aria-label="Breadcrumb"><a href="/" id="ws"></a><span class="slash" id="wsSlash">/</span><span class="cur" id="title">&hellip;</span></nav>
+    <button class="pill" id="verBtn" aria-haspopup="menu" aria-expanded="false" title="Versions"><span class="lv"></span><span class="vn" id="verN">v&hellip;</span><span id="verL">(live)</span><svg class="i s12"><use href="#i-chev"/></svg></button>
+    <span class="pill" id="status"><svg class="i s12"><use href="#i-status"/></svg><span></span></span>
+  </div>
+  <button class="cmdk" id="cmdk" aria-label="Open command bar"><svg class="i s14"><use href="#i-search"/></svg><span class="lbl">Search the plan or run a command</span><span class="kbds"><kbd class="g mod"></kbd><kbd>K</kbd></span></button>
+  <div class="tools">
+    <button class="hbtn m-only" id="cmdkM" aria-label="Open command bar"><svg class="i"><use href="#i-search"/></svg></button>
+    <a class="hbtn" id="protoLink" hidden title="Open the prototype for this plan"><svg class="i"><use href="#i-phone"/></svg><span class="lbl">Prototype</span></a>
+    <a class="hbtn" id="dl" title="Download this version"><svg class="i"><use href="#i-down"/></svg><span class="ext">.md</span></a>
+    <button class="hbtn" data-theme-toggle></button>
+    <span class="live" id="live"><i></i><span id="livetext">Connecting</span></span>
+  </div>
 </header>
 
-<div id="histbar">
-  <span id="histtext"></span>
-  <button id="histrestore">Restore this version</button>
-  <button id="histback">Back to live</button>
+<div class="app">
+  <aside class="pane pane-left" id="pane-outline" aria-label="Outline and versions">
+    <div class="pl-h"><span>Outline</span></div>
+    <ul class="outline" id="outline"></ul>
+    <div class="pl-gap"></div>
+    <div class="pl-h"><span>Versions</span><span class="n" id="vcount"></span></div>
+    <ul class="versions" id="versions"></ul>
+    <div class="pl-foot">
+      <div class="r"><span>Commands</span><span class="kbds"><kbd class="g mod"></kbd><kbd>K</kbd></span></div>
+      <div class="r"><span>Comment, suggest edit</span><span class="kbds"><kbd>C</kbd><kbd>E</kbd></span></div>
+    </div>
+  </aside>
+
+  <main class="pane pane-doc m-active" id="pane-plan" aria-label="Plan">
+    <div class="doc-scroll" id="docScroll">
+      <div class="docbar">
+        <span class="path"><svg class="i s14"><use href="#i-file"/></svg><span id="path"></span></span>
+        <span class="meta" id="docmeta"></span>
+        <span class="sp"></span>
+        <label class="mini-switch" id="chgWrap" hidden><button class="switch" role="switch" aria-checked="false" id="chg"></button><span id="chgLbl"></span></label>
+      </div>
+      <div class="histbar" id="histbar" hidden>
+        <span class="t" id="histtext"></span>
+        <button class="btn-sm solo" id="histrestore">Restore this version</button>
+        <button class="btn-ghost" id="histback">Back to live</button>
+      </div>
+      <article class="doc" id="doc"></article>
+    </div>
+    <div class="ruler" id="ruler" aria-hidden="true"><div class="thumb" id="rulerThumb"></div></div>
+  </main>
+
+  <aside class="pane pane-right" id="pane-comments" aria-label="Review">
+    <div class="itabs" role="tablist">
+      <button class="itab" role="tab" aria-selected="true" data-tab="comments">Comments <span class="rdot" id="rdot" hidden></span><span class="ct" id="ccount">0</span></button>
+      <button class="itab" role="tab" aria-selected="false" data-tab="history">History</button>
+      <button class="itab" role="tab" aria-selected="false" data-tab="prototype">Prototype</button>
+    </div>
+    <div class="ipanel" id="tab-comments" role="tabpanel"></div>
+    <div class="ipanel" id="tab-history" role="tabpanel" hidden></div>
+    <div class="ipanel" id="tab-prototype" role="tabpanel" hidden></div>
+    <div class="ifoot" id="ifoot"></div>
+  </aside>
 </div>
 
-<main>
-  <article id="doc"></article>
-  <aside id="rail"></aside>
-</main>
+<nav class="tabbar" id="tabbar" role="tablist">
+  <button data-pane="pane-outline" aria-selected="false"><svg class="i"><use href="#i-list"/></svg>Outline</button>
+  <button data-pane="pane-plan" aria-selected="true"><svg class="i"><use href="#i-doc"/></svg>Plan</button>
+  <button data-pane="pane-comments" aria-selected="false"><svg class="i"><use href="#i-comment"/></svg>Comments<span class="tb-badge" id="tbBadge" hidden></span></button>
+</nav>
 
-<div id="seltool" hidden>
-  <button id="act-comment"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20.5l1.4-4.9A8 8 0 1 1 21 12z"/></svg>Comment</button>
-  <button id="act-edit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M14 6l4 4"/></svg>Suggest edit</button>
+<div class="seltool" id="seltool" hidden>
+  <button id="act-comment"><svg class="i s14"><use href="#i-comment"/></svg>Comment <kbd>C</kbd></button>
+  <span class="sep"></span>
+  <button id="act-edit"><svg class="i s14"><use href="#i-edit"/></svg>Suggest edit <kbd>E</kbd></button>
 </div>
+<div class="pop" id="verPop" role="menu" hidden></div>
 
 <script>
 const slug = location.pathname.split('/').filter(Boolean).slice(1).map(decodeURIComponent).join('/');
-const docEl = document.getElementById('doc');
-const seltool = document.getElementById('seltool');
-const {api, toast} = Redline;
-const state = { plan:null, sel:null, history:[], historySha:null };
+const ws = slug.includes('/') ? slug.split('/')[0] : '';
+const {api, toast, esc} = Redline;
+const {MAC, theme, niceDate, subjectTitle, vLabel, showPane, setLive} = Studio;
+const $ = id => document.getElementById(id);
+const docEl = $('doc'), scroller = $('docScroll'), seltool = $('seltool');
+const state = { plan:null, history:[], historySha:null, sel:null, changes:false, prev:null };
 
-function setLive(on) {
-  const el = document.getElementById('live');
-  el.classList.toggle('on', on);
-  document.getElementById('livetext').textContent = on ? 'live' : 'server offline';
+/* ---------- theme ---------- */
+
+// diagrams are drawn in the theme's colors, so a switch redraws the plan
+Studio.onTheme(() => {
+  setupMermaid();
+  if (state.historySha) enterHistory(state.historySha); else { state.plan = null; refresh(); }
+});
+
+function setupMermaid() {
+  const dark = theme() === 'dark';
+  mermaid.initialize({
+    startOnLoad: false, securityLevel: 'loose', fontFamily: 'Geist, ui-sans-serif, system-ui, sans-serif',
+    theme: dark ? 'dark' : 'neutral',
+    themeVariables: dark ? {
+      background: 'transparent', primaryColor: '#1b1e26', primaryBorderColor: '#414755', primaryTextColor: '#d6d5cf',
+      lineColor: '#7f8492', secondaryColor: '#232731', tertiaryColor: '#171a21', textColor: '#d6d5cf',
+      actorBkg: '#1b1e26', actorBorder: '#414755', actorTextColor: '#ecebe6', actorLineColor: '#414755',
+      signalColor: '#aeb2bd', signalTextColor: '#d6d5cf', labelBoxBkgColor: '#1b1e26', labelTextColor: '#d6d5cf',
+      noteBkgColor: '#232731', noteTextColor: '#d6d5cf', noteBorderColor: '#414755',
+      sequenceNumberColor: '#111318', clusterBkg: '#171a21', clusterBorder: '#323744', edgeLabelBackground: '#171a21'
+    } : { background: 'transparent' }
+  });
 }
+
+/* ---------- review panel ---------- */
 
 const rail = Redline.mount({
   slug,
-  rail: document.getElementById('rail'),
-  hint: 'Select any passage in the plan to comment on it or suggest an edit. ' +
+  list: $('tab-comments'),
+  footer: $('ifoot'),
+  hint: 'Select any passage in the plan and press <kbd>C</kbd> to comment or <kbd>E</kbd> to suggest an edit. ' +
         'Drafts collect here; send them to Claude in one batch.',
-  actions: [{label: '+ General note (no selection)', onClick: () => {
-    state.sel = {quote:'', section:'', prefix:'', suffix:'', rect:null};
-    openForm('comment');
-  }}],
-  onCardClick: item => { RedlineAnchors.reveal(docEl, item.id); },
+  actions: [{label: 'General note', key: 'N', title: 'A note about the whole plan', onClick: () => generalNote()}],
+  onCardClick: item => revealItem(item.id),
+  onRender: () => {
+    const c = rail.counts();
+    $('ccount').textContent = c.total;
+    $('rdot').hidden = !c.answered;
+    $('tbBadge').hidden = !c.answered;
+    $('tbBadge').textContent = c.answered;
+  },
   refresh: () => refresh(),
 });
 
-/* ---------- rendering ---------- */
+/* ---------- rendering the plan ---------- */
+
+function diagramName(src) {
+  const first = src.trim().split(/\s/)[0];
+  return /^(flowchart|graph)$/.test(first) ? 'Flowchart' : first === 'sequenceDiagram' ? 'Sequence'
+       : /^stateDiagram/.test(first) ? 'State' : first === 'classDiagram' ? 'Classes'
+       : first === 'erDiagram' ? 'Entities' : first === 'gantt' ? 'Timeline' : 'Diagram';
+}
+const firstLine = src => String(src).split('-')[0];
+
+function decorate() {
+  // source line numbers in the gutter, on top level blocks and list items
+  for (const el of docEl.children) if (el.dataset.src) el.dataset.line = firstLine(el.dataset.src);
+  docEl.querySelectorAll('li[data-src]').forEach(li => { li.dataset.line = firstLine(li.dataset.src); });
+  // tables get a frame that scrolls sideways; the outer box carries the
+  // line number and comment mark so the scroller does not clip them
+  docEl.querySelectorAll(':scope > table').forEach(t => {
+    const w = document.createElement('div');
+    w.className = 'tbl';
+    if (t.dataset.src) w.dataset.line = firstLine(t.dataset.src);
+    delete t.dataset.line;
+    const sc = document.createElement('div');
+    sc.className = 'tbl-s';
+    t.replaceWith(w);
+    w.appendChild(sc);
+    sc.appendChild(t);
+  });
+  // diagrams get a header with their lines and a Diagram / Source switch
+  docEl.querySelectorAll('pre > code.language-mermaid').forEach(code => {
+    const pre = code.parentElement;
+    const src = code.textContent;
+    const range = pre.dataset.src || '';
+    const [a, b] = range.split('-');
+    const dia = document.createElement('div');
+    dia.className = 'dia mermaid-wrap';
+    if (range) { dia.dataset.src = range; dia.dataset.line = a; }
+    dia.innerHTML = '<div class="dia-h"><span class="nm">' + diagramName(src) + '</span>'
+      + (range ? '<span class="rng">lines ' + a + (b ? ' to ' + b : '') + '</span>' : '')
+      + '<span class="sp"></span><span class="seg"><button aria-pressed="true" data-v="d">Diagram</button>'
+      + '<button aria-pressed="false" data-v="s">Source</button></span></div>'
+      + '<div class="dia-b"><div class="mermaid"></div></div><pre class="src" hidden></pre>';
+    dia.querySelector('.mermaid').textContent = src;
+    dia.querySelector('pre.src').textContent = src;
+    pre.replaceWith(dia);
+  });
+}
+
+docEl.addEventListener('click', e => {
+  const b = e.target.closest('.dia .seg button');
+  if (!b) return;
+  const dia = b.closest('.dia');
+  const src = b.dataset.v === 's';
+  dia.querySelectorAll('.seg button').forEach(x => x.setAttribute('aria-pressed', x === b));
+  dia.querySelector('.dia-b').hidden = src;
+  dia.querySelector('pre.src').hidden = !src;
+});
+
+function renderBody(markdown, bodyLine) {
+  RedlineAnchors.render(docEl, markdown, bodyLine || 1);
+  decorate();
+  buildOutline();
+  const nodes = docEl.querySelectorAll('.mermaid');
+  if (nodes.length) { try { mermaid.run({nodes}).then(drawRuler, () => {}); } catch (e) {} }
+  if (state.changes && !state.historySha) markChanges();
+}
+
+function header(meta, live) {
+  const title = meta.title || slug;
+  $('title').textContent = title;
+  document.title = title + ' · Redline';
+  $('ws').textContent = ws;
+  $('ws').hidden = $('wsSlash').hidden = !ws;
+  $('verN').textContent = 'v' + (meta.version || '1');
+  $('verL').textContent = live ? '(live)' : '(read only)';
+  $('verBtn').classList.toggle('old', !live);
+  $('status').querySelector('span').textContent = meta.status || 'draft';
+  $('path').textContent = slug + '.md';
+  const pl = $('protoLink');
+  pl.hidden = !meta.prototype;
+  if (meta.prototype) pl.href = '/proto/' + meta.prototype;
+  $('dl').href = state.historySha ? '/raw-at/' + state.historySha + '/' + slug : '/raw/' + slug;
+}
 
 function renderPlan(plan) {
-  document.getElementById('title').textContent = plan.meta.title || slug;
-  document.title = (plan.meta.title || slug) + ' · Redline';
-  const vsel = document.getElementById('version');
-  let live = vsel.querySelector('option[value="__live__"]');
-  if (!live) {
-    live = document.createElement('option');
-    live.value = '__live__';
-    vsel.prepend(live);
-  }
-  live.textContent = 'v' + (plan.meta.version || '1') + ' (live)';
-  vsel.value = '__live__';
-  document.getElementById('pstatus').textContent = plan.meta.status || 'draft';
-  const pl = document.getElementById('protolink');
-  pl.hidden = !plan.meta.prototype;
-  if (plan.meta.prototype) pl.href = '/proto/' + plan.meta.prototype;
-  renderMarkdownBody(plan.markdown, plan.body_line);
+  header(plan.meta, true);
+  docMeta();
+  renderBody(plan.markdown, plan.body_line);
+  renderPrototypeTab();
 }
 
-function renderMarkdownBody(markdown, bodyLine) {
-  // blocks carry the source lines they came from (data-src), for anchors
-  RedlineAnchors.render(docEl, markdown, bodyLine || 1);
-  docEl.querySelectorAll('pre > code.language-mermaid').forEach(code => {
-    const wrap = document.createElement('div');
-    wrap.className = 'mermaid-wrap';
-    if (code.parentElement.dataset.src) wrap.dataset.src = code.parentElement.dataset.src;
-    const div = document.createElement('div');
-    div.className = 'mermaid';
-    div.textContent = code.textContent;
-    wrap.appendChild(div);
-    code.parentElement.replaceWith(wrap);
+function docMeta() {
+  const plan = state.plan;
+  if (!plan || state.historySha) return;
+  const latest = state.history[0];
+  $('docmeta').textContent = 'v' + (plan.meta.version || '1')
+    + (latest ? ', saved ' + niceDate(latest.date) : plan.meta.updated ? ', updated ' + plan.meta.updated : '');
+}
+
+/* ---------- outline ---------- */
+
+function headingId(text, used) {
+  let id = 'h-' + text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  while (used.has(id)) id += '-x';
+  used.add(id);
+  return id;
+}
+
+function buildOutline() {
+  const used = new Set();
+  const hs = Array.from(docEl.querySelectorAll('h1, h2, h3'));
+  hs.forEach(h => { h.id = headingId(h.textContent, used); });
+  let html = '', open = false;
+  hs.forEach(h => {
+    const lvl = +h.tagName[1];
+    const a = '<a data-target="' + h.id + '"><span class="t">' + esc(h.textContent) + '</span><span class="badge" data-badge="' + h.id + '" hidden></span></a>';
+    if (lvl === 3) {
+      if (!open) { html += '<ul>'; open = true; }
+      html += '<li>' + a + '</li>';
+    } else {
+      if (open) { html += '</ul>'; open = false; }
+      html += (html ? '</li>' : '') + '<li>' + a;
+    }
   });
-  const nodes = docEl.querySelectorAll('.mermaid');
-  if (nodes.length) {
-    try { mermaid.run({nodes}).catch(() => {}); } catch (e) {}
+  if (open) html += '</ul>';
+  if (html) html += '</li>';
+  $('outline').innerHTML = html || '<li class="pl-empty">No headings</li>';
+  trackSection();
+}
+
+$('outline').addEventListener('click', e => {
+  const a = e.target.closest('a[data-target]');
+  if (!a) return;
+  showPane('pane-plan');
+  jumpTo($(a.dataset.target));
+});
+
+// a section picked from the outline or the command bar stays lit until the
+// reader scrolls by hand, even when the page cannot scroll it to the top
+let pinnedSection = null;
+['wheel', 'touchmove'].forEach(t => scroller.addEventListener(t, () => { pinnedSection = null; }, {passive: true}));
+document.addEventListener('keydown', e => { if (/^(Arrow|Page|Home|End| )/.test(e.key)) pinnedSection = null; });
+
+function jumpTo(el) {
+  if (!el) return;
+  if (/^H[1-3]$/.test(el.tagName)) { pinnedSection = el.id; trackSection(); }
+  if (scroller.scrollHeight > scroller.clientHeight + 2) {
+    const top = el.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop - 56;
+    scroller.scrollTo({top, behavior: 'smooth'});
+  } else {
+    el.scrollIntoView({behavior: 'smooth', block: 'start'});
   }
 }
 
-/* ---------- version history ---------- */
+function trackSection() {
+  const hs = Array.from(docEl.querySelectorAll('h1, h2, h3'));
+  const box = scroller.getBoundingClientRect();
+  // at the very end the last sections cannot reach the top; take the last one in view
+  const atEnd = scroller.scrollHeight > scroller.clientHeight + 2 && scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 4;
+  const limit = atEnd ? box.bottom - 60 : box.top + Math.min(220, scroller.clientHeight * .3);
+  let cur = hs[0];
+  for (const h of hs) { if (h.getBoundingClientRect().top <= limit) cur = h; else break; }
+  if (pinnedSection && $(pinnedSection)) cur = $(pinnedSection);
+  document.querySelectorAll('#outline a').forEach(a => a.classList.toggle('on', !!cur && a.dataset.target === cur.id));
+}
+
+/* ---------- comments in the document: highlights, block marks, ruler, badges ---------- */
+
+const RANK = {answered: 4, draft: 3, submitted: 2, resolved: 1};
+const TICK = {answered: 't-reply', draft: 't-draft', submitted: 't-waiting', resolved: 't-resolved'};
+const BADGE = {answered: 'b-reply', draft: 'b-draft', submitted: 'b-waiting', resolved: 'b-resolved'};
+
+function applyHighlights() {
+  if (state.historySha) return;
+  RedlineAnchors.paint(docEl, rail.items(), state.plan && state.plan.meta.version);
+  docEl.querySelectorAll('.has-c').forEach(el => el.classList.remove('has-c', 't-reply', 't-draft', 't-waiting', 't-resolved'));
+  const blocks = new Map();
+  const hs = Array.from(docEl.querySelectorAll('h1, h2, h3'));
+  const perHeading = new Map();
+  for (const item of rail.items()) {
+    const r = RedlineAnchors.rangeOf(item.id);
+    if (!r) continue;
+    const node = r.startContainer.nodeType === 1 ? r.startContainer : r.startContainer.parentElement;
+    const block = node && node.closest('[data-line]');
+    if (block) {
+      const cur = blocks.get(block);
+      if (!cur || RANK[item.status] > RANK[cur]) blocks.set(block, item.status);
+    }
+    // which heading this comment sits under
+    let under = null;
+    for (const h of hs) { if (h === node || h.contains(node) || (h.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING)) under = h; else break; }
+    if (under) { if (!perHeading.has(under)) perHeading.set(under, []); perHeading.get(under).push(item.status); }
+  }
+  blocks.forEach((s, el) => el.classList.add('has-c', TICK[s] || 't-draft'));
+  // outline badges: a section counts its own comments and those of its
+  // sub-sections (the title heading counts only its own, like the outline)
+  hs.forEach((h, i) => {
+    const lvl = +h.tagName[1];
+    let statuses = (perHeading.get(h) || []).slice();
+    if (lvl > 1) for (let j = i + 1; j < hs.length && +hs[j].tagName[1] > lvl; j++) statuses = statuses.concat(perHeading.get(hs[j]) || []);
+    const badge = document.querySelector('[data-badge="' + h.id + '"]');
+    if (!badge) return;
+    badge.hidden = !statuses.length;
+    if (!statuses.length) return;
+    const top = statuses.slice().sort((a, b) => RANK[b] - RANK[a])[0];
+    badge.className = 'badge ' + (BADGE[top] || '');
+    badge.textContent = statuses.length;
+  });
+  drawRuler();
+}
+
+function drawRuler() {
+  const ruler = $('ruler');
+  ruler.querySelectorAll('.tk').forEach(t => t.remove());
+  const H = ruler.clientHeight, total = scroller.scrollHeight;
+  if (!H || !total || state.historySha) return;
+  const base = scroller.getBoundingClientRect().top - scroller.scrollTop;
+  for (const item of rail.items()) {
+    const r = RedlineAnchors.rangeOf(item.id);
+    if (!r) continue;
+    const y = r.getBoundingClientRect().top - base;
+    const tk = document.createElement('div');
+    tk.className = 'tk ' + (TICK[item.status] || 't-draft');
+    tk.style.top = Math.max(0, Math.min(H - 4, y / total * H)) + 'px';
+    tk.title = item.quote || 'Comment';
+    tk.onclick = () => revealItem(item.id);
+    ruler.appendChild(tk);
+  }
+  rulerThumb();
+}
+
+function rulerThumb() {
+  const H = $('ruler').clientHeight, total = scroller.scrollHeight;
+  if (!total) return;
+  $('rulerThumb').style.top = (scroller.scrollTop / total * H) + 'px';
+  $('rulerThumb').style.height = Math.max(16, scroller.clientHeight / total * H) + 'px';
+}
+
+scroller.addEventListener('scroll', () => { trackSection(); rulerThumb(); seltool.hidden = true; }, {passive: true});
+window.addEventListener('resize', drawRuler);
+
+function revealItem(id) {
+  showPane('pane-plan');
+  if (!RedlineAnchors.reveal(docEl, id)) return;
+  const r = RedlineAnchors.rangeOf(id);
+  if (r && scroller.scrollHeight > scroller.clientHeight + 2) {
+    const top = r.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop - scroller.clientHeight / 3;
+    scroller.scrollTo({top, behavior: 'smooth'});
+  }
+}
+
+/* ---------- versions, history, changes ---------- */
+
+const liveVersion = () => String(state.plan && state.plan.meta.version || '');
+const isLiveCommit = (c, i) => Studio.isLive(c, i, liveVersion());
 
 async function loadHistory() {
   let data;
   try { data = await api('/api/history/' + slug); } catch (e) { return; }
   state.history = data.commits || [];
-  const vsel = document.getElementById('version');
-  const keep = vsel.value;
-  vsel.querySelectorAll('option:not([value="__live__"])').forEach(o => o.remove());
-  for (const c of state.history) {
-    const opt = document.createElement('option');
-    opt.value = c.sha;
-    const label = c.version ? ('v' + c.version) : c.short;
-    opt.textContent = label + ' · ' + c.date;
-    vsel.appendChild(opt);
-  }
-  vsel.value = keep && [...vsel.options].some(o => o.value === keep) ? keep : '__live__';
+  renderVersions();
+  setupChanges();
+  docMeta();
 }
+
+function renderVersions() {
+  $('vcount').textContent = state.history.length || '';
+  $('versions').innerHTML = Studio.versionList(state.history, liveVersion(), state.historySha);
+  $('tab-history').innerHTML = Studio.historyTimeline(state.history, liveVersion(), state.historySha, slug);
+}
+
+$('versions').addEventListener('click', e => {
+  const b = e.target.closest('.vrow');
+  if (!b) return;
+  showPane('pane-plan');
+  if (b.dataset.live === 'true') exitHistory(); else enterHistory(b.dataset.sha);
+});
+$('tab-history').addEventListener('click', e => {
+  const b = e.target.closest('button[data-sha]');
+  if (b) enterHistory(b.dataset.sha);
+});
 
 async function enterHistory(sha) {
   let data;
   try { data = await api('/api/history-at/' + sha + '/' + slug); }
-  catch (e) { toast('Could not load that version'); document.getElementById('version').value = '__live__'; return; }
+  catch (e) { toast('Could not load that version'); return; }
   state.historySha = sha;
-  clearHighlights();
+  RedlineAnchors.clear(docEl);
   rail.setDisabled(true);
   const c = state.history.find(h => h.sha === sha);
-  const bar = document.getElementById('histbar');
-  bar.classList.add('on');
-  document.getElementById('histtext').textContent =
-    'Read only · ' + (data.meta.title || slug) + ' ' +
-    (c && c.version ? 'v' + c.version : (c ? c.short : sha.slice(0, 7))) +
-    (c ? ' · ' + c.date : '') + (c ? ' · ' + c.subject : '');
-  document.getElementById('pstatus').textContent = data.meta.status || '';
-  renderMarkdownBody(data.markdown, data.body_line);
+  $('histbar').hidden = false;
+  $('histtext').textContent = 'Read only: ' + (c ? vLabel(c) + ', ' + niceDate(c.date) + ', ' + subjectTitle(c) : sha.slice(0, 7));
+  $('chgWrap').hidden = true;
+  header(data.meta, false);
+  $('docmeta').textContent = c ? vLabel(c) + ', saved ' + niceDate(c.date) : '';
+  docEl.classList.remove('show-changes');
+  renderBody(data.markdown, data.body_line);
+  $('ruler').querySelectorAll('.tk').forEach(t => t.remove());
+  renderVersions();
 }
 
 function exitHistory() {
-  state.historySha = null;
-  document.getElementById('histbar').classList.remove('on');
-  rail.setDisabled(false);
-  document.getElementById('version').value = '__live__';
-  state.plan = null; // force a full re-render on next refresh
-  refresh();
-}
-
-document.getElementById('version').addEventListener('change', e => {
-  const v = e.target.value;
-  if (v === '__live__') exitHistory();
-  else enterHistory(v);
-});
-document.getElementById('histback').addEventListener('click', exitHistory);
-
-document.getElementById('download').addEventListener('click', () => {
-  window.location.href = state.historySha
-    ? '/raw-at/' + state.historySha + '/' + slug
-    : '/raw/' + slug;
-});
-
-document.getElementById('histrestore').addEventListener('click', async () => {
   if (!state.historySha) return;
-  if (!confirm('Restore this version as the new latest? This adds it as a new version; nothing is lost.')) return;
+  state.historySha = null;
+  $('histbar').hidden = true;
+  rail.setDisabled(false);
+  docEl.classList.toggle('show-changes', state.changes);
+  state.plan = null;
+  refresh().then(() => { renderVersions(); setupChanges(); });
+}
+$('histback').onclick = exitHistory;
+$('histrestore').onclick = async () => {
+  if (!state.historySha) return;
+  if (!confirm('Restore this version as the new latest? It is added as a new version; nothing is lost.')) return;
   try {
     const r = await api('/api/restore/' + state.historySha + '/' + slug, {});
     toast('Restored as v' + r.version);
     exitHistory();
     loadHistory();
   } catch (e) { toast('Restore failed'); }
+};
+
+/* changes since the previous version: a line diff of the plan body */
+function previousCommit() {
+  const live = liveVersion();
+  return state.history.find(c => c.version && c.version !== live) || null;
+}
+
+function setupChanges() {
+  const prev = previousCommit();
+  $('chgWrap').hidden = !prev || !!state.historySha;
+  if (prev) $('chgLbl').textContent = 'Changes since ' + vLabel(prev);
+  if (!prev && state.changes) toggleChanges(false);
+}
+
+function changedLines(a, b) {
+  // indexes of lines in b that are not part of the longest common subsequence with a
+  const n = a.length, m = b.length;
+  if (n * m > 4e6) { const set = new Set(a); return new Set(b.map((l, j) => set.has(l) ? -1 : j).filter(j => j >= 0)); }
+  const dp = Array.from({length: n + 1}, () => new Uint16Array(m + 1));
+  for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--)
+    dp[i][j] = a[i] === b[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+  const out = new Set();
+  let i = 0, j = 0;
+  while (j < m) {
+    if (i < n && a[i] === b[j]) { i++; j++; }
+    else if (i < n && dp[i + 1][j] >= dp[i][j + 1]) i++;
+    else { out.add(j); j++; }
+  }
+  return out;
+}
+
+async function markChanges() {
+  docEl.querySelectorAll('[data-changed]').forEach(el => el.removeAttribute('data-changed'));
+  const prev = previousCommit();
+  if (!prev || !state.plan) return;
+  if (!state.prev || state.prev.sha !== prev.sha) {
+    try { state.prev = Object.assign({sha: prev.sha}, await api('/api/history-at/' + prev.sha + '/' + slug)); }
+    catch (e) { return; }
+  }
+  const cur = state.plan.markdown.split('\n'), old = state.prev.markdown.split('\n');
+  const changed = changedLines(old.map(s => s.trim()), cur.map(s => s.trim()));
+  const base = state.plan.body_line || 1;
+  const lines = new Set([...changed].filter(j => cur[j].trim()).map(j => base + j));
+  docEl.querySelectorAll('[data-src]').forEach(el => {
+    if (el.querySelector('[data-src]')) return;  // the innermost blocks only
+    const [a, b] = el.dataset.src.split('-').map(Number);
+    for (let l = a; l <= (b || a); l++) if (lines.has(l)) { el.dataset.changed = ''; break; }
+  });
+  docEl.querySelectorAll('.tbl').forEach(t => { if (t.querySelector('[data-changed]')) t.dataset.changed = ''; });
+}
+
+function toggleChanges(on) {
+  state.changes = on == null ? !state.changes : on;
+  $('chg').setAttribute('aria-checked', state.changes);
+  docEl.classList.toggle('show-changes', state.changes);
+  if (state.changes) markChanges();
+}
+$('chg').onclick = e => { e.preventDefault(); toggleChanges(); };
+
+/* version menu in the header */
+Studio.menu($('verBtn'), $('verPop'), () => {
+  const prev = previousCommit();
+  return Studio.versionMenuItems(state.history, liveVersion(), state.historySha)
+    + '<div class="pop-f">' + (prev && !state.historySha ? '<button data-act="changes">' + (state.changes ? 'Hide' : 'Show') + ' changes since ' + esc(vLabel(prev)) + '</button>' : '')
+    + '<button data-act="download">Download this version</button></div>';
+}, b => {
+  if (b.dataset.act === 'changes') toggleChanges();
+  else if (b.dataset.act === 'download') location.href = $('dl').href;
+  else if (b.dataset.live === 'true') exitHistory();
+  else if (b.dataset.sha) enterHistory(b.dataset.sha);
 });
 
-function clearHighlights() {
-  RedlineAnchors.clear(docEl);
+/* ---------- prototype tab ---------- */
+
+async function renderPrototypeTab() {
+  const p = state.plan && state.plan.meta.prototype;
+  const tab = $('tab-prototype');
+  if (!p) {
+    tab.dataset.proto = '';
+    tab.innerHTML = '<div class="empty-state"><b>No prototype linked</b>Ask Claude for a playable prototype of this plan; it links itself here, and you can pin comments on its components.</div>';
+    return;
+  }
+  if (tab.dataset.proto === p) return;
+  tab.dataset.proto = p;
+  let meta = {};
+  try { meta = (await api('/api/proto/' + p)).meta || {}; } catch (e) {}
+  tab.innerHTML = '<div class="proto-stage"><div class="phone"><div class="screen">'
+    + '<iframe src="/p/' + esc(p) + '/" sandbox="allow-scripts" tabindex="-1" title="Prototype preview" loading="lazy"></iframe></div></div></div>'
+    + '<div class="pmeta"><div><div class="t">' + esc(meta.title || p) + '</div><div class="path">' + esc(p) + ' · v' + esc(meta.version || '1') + '</div></div>'
+    + '<a class="btn-sec" href="/proto/' + esc(p) + '"><svg class="i"><use href="#i-phone"/></svg>Open prototype</a></div>';
 }
 
-function applyHighlights() {
-  RedlineAnchors.paint(docEl, rail.items(), state.plan && state.plan.meta.version);
-}
+/* ---------- inspector tabs and phone panes ---------- */
 
-/* ---------- polling ---------- */
+document.querySelector('.itabs').addEventListener('click', e => {
+  const t = e.target.closest('.itab');
+  if (t) showTab(t.dataset.tab);
+});
+function showTab(name) {
+  document.querySelectorAll('.itab').forEach(t => t.setAttribute('aria-selected', t.dataset.tab === name));
+  ['comments', 'history', 'prototype'].forEach(n => { $('tab-' + n).hidden = n !== name; });
+}
+/* ---------- live data ---------- */
 
 async function refresh() {
   if (state.historySha) return;
@@ -270,81 +575,115 @@ async function refresh() {
   if (rail.busy()) return;
   const planChanged = !state.plan || state.plan.mtime !== plan.mtime;
   if (planChanged) {
-    const y = window.scrollY;
+    const y = scroller.scrollTop;
     const oldV = state.plan && state.plan.meta.version;
+    state.plan = plan;
     renderPlan(plan);
-    window.scrollTo(0, y);
+    scroller.scrollTop = y;
     if (oldV && oldV !== plan.meta.version) {
       toast('Claude updated the plan to v' + plan.meta.version);
+      state.prev = null;
       loadHistory();
     }
-    state.plan = plan;
   }
   const fbChanged = rail.setFeedback(fb);
   if (planChanged || fbChanged) applyHighlights();
 }
 
-/* ---------- selection & forms ---------- */
+/* ---------- selection, comments and notes ---------- */
 
 document.addEventListener('mouseup', e => {
-  if (rail.isFormOpen() || seltool.contains(e.target) ||
-      document.getElementById('popover').contains(e.target)) return;
+  if (rail.isFormOpen() || seltool.contains(e.target) || $('popover').contains(e.target) || state.historySha) return;
   setTimeout(() => {
     const sel = window.getSelection();
-    if (!sel || sel.isCollapsed) { seltool.hidden = true; return; }
+    if (!sel || sel.isCollapsed) { seltool.hidden = true; state.sel = null; return; }
     const text = sel.toString().trim();
     if (text.length < 3) { seltool.hidden = true; return; }
     const range = sel.getRangeAt(0);
     if (!docEl.contains(range.commonAncestorContainer)) { seltool.hidden = true; return; }
-    // where the selection is in the source, not just what it says
     const cap = RedlineAnchors.capture(docEl, range, text);
     if (!cap) { seltool.hidden = true; return; }
     const r = range.getBoundingClientRect();
-    state.sel = Object.assign(cap, {
-      rect: {left: r.left + scrollX, right: r.right + scrollX,
-             top: r.top + scrollY, bottom: r.bottom + scrollY}
-    });
+    state.sel = Object.assign(cap, {rect: {left: r.left + scrollX, right: r.right + scrollX, top: r.top + scrollY, bottom: r.bottom + scrollY}});
     seltool.hidden = false;
-    seltool.style.left = Math.max(8, Math.min(
-      state.sel.rect.left, scrollX + innerWidth - seltool.offsetWidth - 16)) + 'px';
-    seltool.style.top = (state.sel.rect.top - seltool.offsetHeight - 8) + 'px';
+    const w = seltool.offsetWidth, h = seltool.offsetHeight;
+    seltool.style.left = Math.max(8, Math.min(r.left + scrollX + r.width / 2 - w / 2, scrollX + innerWidth - w - 12)) + 'px';
+    seltool.style.top = (r.top + scrollY - h - 8 < scrollY + 56 ? r.bottom + scrollY + 8 : r.top + scrollY - h - 8) + 'px';
   }, 10);
 });
 
 function openForm(type) {
-  seltool.hidden = true;
   const s = state.sel;
+  if (!s) return;
+  seltool.hidden = true;
   const extra = {quote: s.quote, section: s.section, prefix: s.prefix, suffix: s.suffix};
   if (s.anchor) {
     extra.anchor = s.anchor;
-    // the version and commit the lines refer to
-    extra.at = {version: state.plan && state.plan.meta.version,
-                sha: state.history[0] && state.history[0].sha};
+    extra.at = {version: state.plan && state.plan.meta.version, sha: state.history[0] && state.history[0].sha};
     if (s.quote_len) extra.quote_len = s.quote_len;
   }
   rail.openForm(type, {
-    label: s.quote ? '“' + s.quote + '”' : 'General note on the whole plan',
-    where: s.anchor ? 'line ' + s.anchor.lines + ' · ' + s.anchor.where : '',
-    editText: s.full || s.quote,
-    rect: s.rect,
-    extra,
-    onClose: () => { const sel = window.getSelection(); if (sel) sel.removeAllRanges(); },
+    label: s.quote, where: s.anchor ? 'line ' + s.anchor.lines + ' · ' + s.anchor.where : '',
+    editText: s.full || s.quote, allowEdit: true, editLabel: 'Suggest edit', rect: s.rect, extra,
+    onClose: () => { const sel = window.getSelection(); if (sel) sel.removeAllRanges(); state.sel = null; },
   });
 }
 
-document.getElementById('act-comment').onclick = () => openForm('comment');
-document.getElementById('act-edit').onclick = () => openForm('edit');
+function generalNote() {
+  if (state.historySha) { toast('Go back to the live version to comment'); return; }
+  seltool.hidden = true;
+  rail.openForm('comment', {label: 'General note on the whole plan', rect: null, extra: {quote: '', section: '', prefix: '', suffix: ''}});
+}
+
+$('act-comment').onclick = () => openForm('comment');
+$('act-edit').onclick = () => openForm('edit');
+
+/* ---------- command bar ---------- */
+
+function commands() {
+  const out = [];
+  const add = (group, title, run, extra) => out.push(Object.assign({group, title, run}, extra || {}));
+  if (state.sel && !seltool.hidden) {
+    add('Actions', 'Comment on the selection', () => openForm('comment'), {key: 'C'});
+    add('Actions', 'Suggest an edit to the selection', () => openForm('edit'), {key: 'E'});
+  }
+  if (!state.historySha) add('Actions', 'General note', generalNote, {key: 'N'});
+  const c = rail.counts();
+  if (c.draft && !state.historySha) add('Actions', 'Send ' + c.draft + ' to Claude', () => rail.send(), {key: MAC ? '⌘ ↵' : 'Ctrl ↵'});
+  const prev = previousCommit();
+  if (prev && !state.historySha) add('Actions', (state.changes ? 'Hide' : 'Show') + ' changes since ' + vLabel(prev), () => toggleChanges());
+  if (state.historySha) add('Actions', 'Back to the live version', exitHistory);
+  if (state.plan && state.plan.meta.prototype) add('Actions', 'Open the prototype', () => { location.href = '/proto/' + state.plan.meta.prototype; });
+  add('Actions', 'Download this version', () => { location.href = $('dl').href; });
+  add('Actions', 'Switch to the ' + (theme() === 'dark' ? 'light' : 'dark') + ' theme', Studio.toggleTheme);
+  docEl.querySelectorAll('h1, h2, h3').forEach(h => add('Sections', h.textContent.trim(), () => { showPane('pane-plan'); jumpTo(h); }, {icon: 'hash'}));
+  if (!state.historySha) rail.items().forEach(i => add('Comments', (i.quote || 'General note') + (i.comment ? ': ' + i.comment : ''), () => revealItem(i.id),
+    {dot: i.status === 'answered' ? 'var(--red)' : i.status === 'resolved' ? 'var(--green)' : i.status === 'submitted' ? 'var(--blue)' : 'var(--amber)'}));
+  state.history.forEach((v, i) => add('Versions', vLabel(v) + ', ' + subjectTitle(v), () => isLiveCommit(v, i) ? exitHistory() : enterHistory(v.sha), {icon: 'history'}));
+  return out;
+}
+
+const pal = Studio.palette(commands);
+$('cmdk').onclick = pal.open;
+$('cmdkM').onclick = pal.open;
+
+/* ---------- keyboard ---------- */
+
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') seltool.hidden = true;
+  const typing = e.target.closest && e.target.closest('input, textarea, select, [contenteditable="true"]');
+  const mod = e.metaKey || e.ctrlKey;
+  if (mod && e.key === 'Enter' && !typing && !rail.isFormOpen()) { e.preventDefault(); if (!state.historySha) rail.send(); return; }
+  if (typing || mod || e.altKey || pal.isOpen()) return;
+  const k = e.key.toLowerCase();
+  if (k === 'c' && state.sel && !seltool.hidden) { e.preventDefault(); openForm('comment'); }
+  else if (k === 'e' && state.sel && !seltool.hidden) { e.preventDefault(); openForm('edit'); }
+  else if (k === 'n' && !rail.isFormOpen()) { e.preventDefault(); generalNote(); }
+  else if (e.key === 'Escape') seltool.hidden = true;
 });
 
 /* ---------- boot ---------- */
 
-mermaid.initialize({
-  startOnLoad: false,
-  securityLevel: 'loose',
-  theme: matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'neutral'
-});
+setupMermaid();
 refresh().then(loadHistory);
 setInterval(refresh, 2500);
 </script>
