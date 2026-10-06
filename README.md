@@ -31,12 +31,21 @@ Redline moves both into the browser and sends your feedback straight back to the
 
 ## Install
 
-**As a Claude Code plugin** (recommended). In Claude Code:
+**As a Claude Code plugin** (recommended). In Claude Code, run these one at a time (each block has a copy button):
 
-```
-/plugin marketplace add NikkyAmresh/claude-plugins
-/plugin install redline@nikkyamresh
-```
+1. Add the marketplace:
+
+   ```
+   /plugin marketplace add NikkyAmresh/claude-plugins
+   ```
+
+2. Install Redline:
+
+   ```
+   /plugin install redline@nikkyamresh
+   ```
+
+3. Run `/reload-plugins`, or start a new session; the server starts with it.
 
 Redline is listed in [NikkyAmresh/claude-plugins](https://github.com/NikkyAmresh/claude-plugins), a marketplace for all of its author's Claude Code plugins. The plugin bundles the skill and starts the server when a session opens (reusing it if it is already running). Your plans and feedback live in `~/.claude/redline`, outside the plugin, so updates never touch them. Update with `/plugin update redline`.
 

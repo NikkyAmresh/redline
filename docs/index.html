@@ -124,8 +124,25 @@ pre.code {
   border:1px solid var(--line); border-radius:12px;
   font:13.5px/1.75 ui-monospace, Menlo, Consolas, monospace;
 }
-pre.code .c { color:#6c7180; }
-pre.code .p { color:var(--accent-bright); user-select:none; }
+pre.code .c, .cmds .c { color:#6c7180; }
+pre.code .p, .cmds .p { color:var(--accent-bright); user-select:none; }
+/* install commands: one line each, with its own copy button that stays
+   visible while a long line scrolls on a narrow screen */
+.cmds { margin:18px 0 0; padding:8px 8px 8px 18px; background:var(--term-bg); color:var(--term-ink);
+        border:1px solid var(--line); border-radius:12px;
+        font:13.5px/1.75 ui-monospace, Menlo, Consolas, monospace; }
+.cmds .cmd { display:flex; align-items:center; gap:10px; }
+.cmds code { flex:1; min-width:0; overflow-x:auto; white-space:pre; font:inherit; padding:4px 0; }
+.codewrap { position:relative; }
+.codewrap pre.code { padding-right:56px; }
+.codewrap .copy { position:absolute; top:10px; right:10px; }
+button.copy { flex:none; width:32px; height:32px; display:grid; place-items:center; cursor:pointer;
+              border-radius:8px; border:1px solid rgba(255,255,255,.14); background:rgba(255,255,255,.04);
+              color:#9aa0ad; transition:color .15s, border-color .15s, background .15s; }
+button.copy:hover { color:var(--accent-bright); border-color:var(--accent-bright); }
+button.copy:focus-visible { outline:2px solid var(--accent-bright); outline-offset:2px; }
+button.copy.done { color:#4ade80; border-color:#4ade80; background:rgba(74,222,128,.10); }
+.sr { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
 
 /* screenshot */
 .shot { margin:64px auto; }
@@ -284,8 +301,7 @@ footer a:hover { color:var(--accent); }
     <span class="ghost">MIT · Python stdlib · works offline</span>
   </div>
 
-  <pre class="code"><span class="p">&gt;</span> /plugin marketplace add NikkyAmresh/claude-plugins
-<span class="p">&gt;</span> /plugin install redline@nikkyamresh   <span class="c"># starts with each session</span></pre>
+  <div class="code cmds"><div class="cmd"><code><span class="p">&gt;</span> /plugin marketplace add NikkyAmresh/claude-plugins</code><button class="copy" type="button" title="Copy to clipboard" aria-label="Copy the marketplace command" data-copy="/plugin marketplace add NikkyAmresh/claude-plugins"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg></button></div><div class="cmd"><code><span class="p">&gt;</span> /plugin install redline@nikkyamresh   <span class="c"># starts with each session</span></code><button class="copy" type="button" title="Copy to clipboard" aria-label="Copy the install command" data-copy="/plugin install redline@nikkyamresh"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg></button></div></div>
 </main>
 
 <div class="wide shot">
@@ -388,13 +404,12 @@ footer a:hover { color:var(--accent); }
   <section>
     <div class="eyebrow">Quick start</div>
     <h2>Two commands in Claude Code, then ask for a plan.</h2>
-    <pre class="code"><span class="p">&gt;</span> /plugin marketplace add NikkyAmresh/claude-plugins
-<span class="p">&gt;</span> /plugin install redline@nikkyamresh   <span class="c"># starts with each session</span></pre>
+    <div class="code cmds"><div class="cmd"><code><span class="p">&gt;</span> /plugin marketplace add NikkyAmresh/claude-plugins</code><button class="copy" type="button" title="Copy to clipboard" aria-label="Copy the marketplace command" data-copy="/plugin marketplace add NikkyAmresh/claude-plugins"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg></button></div><div class="cmd"><code><span class="p">&gt;</span> /plugin install redline@nikkyamresh   <span class="c"># starts with each session</span></code><button class="copy" type="button" title="Copy to clipboard" aria-label="Copy the install command" data-copy="/plugin install redline@nikkyamresh"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg></button></div></div>
     <p style="margin-top:16px">The plugin bundles the skill and starts the server with each session. Your plans and feedback live in <b>~/.claude/redline</b>, outside the plugin, so updates never touch them. Python 3.7+ and Claude Code, on macOS or Linux.</p>
     <p style="margin-top:12px">Want to hack on Redline itself? Clone it instead (use one or the other):</p>
-    <pre class="code"><span class="p">$</span> git clone https://github.com/NikkyAmresh/redline ~/.claude/redline
+    <div class="codewrap"><pre class="code"><span class="p">$</span> git clone https://github.com/NikkyAmresh/redline ~/.claude/redline
 <span class="p">$</span> ln -s ../redline/skills/redline ~/.claude/skills/redline
-<span class="p">$</span> sh ~/.claude/redline/skills/redline/redline.sh start</pre>
+<span class="p">$</span> sh ~/.claude/redline/skills/redline/redline.sh start</pre><button class="copy" type="button" title="Copy to clipboard" aria-label="Copy the three clone commands" data-copy="git clone https://github.com/NikkyAmresh/redline ~/.claude/redline&#10;ln -s ../redline/skills/redline ~/.claude/skills/redline&#10;sh ~/.claude/redline/skills/redline/redline.sh start"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg></button></div>
     <p style="margin-top:16px">Then ask any session for a plan or a prototype, or say <b>/redline</b>. Two demos ship with it, a plan and the playable app it describes: select a sentence, or press C and click a component, and send Claude a note.</p>
     <div class="cta">
       <a class="btn" href="https://github.com/NikkyAmresh/redline">View on GitHub</a>
@@ -409,5 +424,41 @@ footer a:hover { color:var(--accent); }
   </div>
 </footer>
 
+
+<div class="sr" id="copy-status" aria-live="polite"></div>
+<script>
+// Copy buttons on the install commands: the command text only, no prompt or comment.
+(function () {
+  var status = document.getElementById('copy-status');
+  var OK = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+  function fallback(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) {}
+    ta.remove();
+    return ok;
+  }
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('button.copy');
+    if (!b) return;
+    var text = b.getAttribute('data-copy');
+    var done = function (ok) {
+      if (!b._icon) b._icon = b.innerHTML;
+      b.classList.toggle('done', ok);
+      b.innerHTML = ok ? OK : b._icon;
+      status.textContent = ok ? 'Copied to clipboard' : 'Copy failed, select the text instead';
+      clearTimeout(b._t);
+      b._t = setTimeout(function () { b.classList.remove('done'); b.innerHTML = b._icon; }, 1600);
+    };
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).then(function () { done(true); }, function () { done(fallback(text)); });
+    } else {
+      done(fallback(text));
+    }
+  });
+})();
+</script>
 </body>
 </html>
