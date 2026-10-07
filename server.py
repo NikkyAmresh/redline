@@ -34,9 +34,15 @@ except ImportError:  # Windows: no single-instance lock, everything else works
     fcntl = None
 
 APP = "redline"
-VERSION = "1.3.1"
+VERSION = "1.4.0"
 DEFAULT_PORT = 4747
 PORT_SPAN = 20  # try DEFAULT_PORT..DEFAULT_PORT+20 when a port is taken
+# Appended to the start report, which the plugin's SessionStart hook puts in
+# front of the model. With many skills installed, Claude Code may list skills
+# by name only, and this line still routes plan and prototype requests.
+SKILL_HINT = ("Use the redline:plan-review skill for plans, design docs, roadmaps "
+              "and architecture proposals, and redline:prototype-review for "
+              "prototypes, mockups, wireframes and UI or design feedback.")
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 HOME_DIR = os.path.join(os.path.expanduser("~"), ".claude", "redline")
@@ -1400,7 +1406,8 @@ def main():
         if lock is None:  # another start won the race; report that one
             url = running_url()
     if url:
-        print(url if args.url else "Redline is running at %s (data: %s)" % (url, DATA))
+        print(url if args.url else
+              "Redline is running at %s (data: %s). %s" % (url, DATA, SKILL_HINT))
         return 0
 
     port = choose_port(explicit)
@@ -1412,7 +1419,8 @@ def main():
         srv6 = None
     if args.daemon or args.url:
         if not detach(url):
-            print(url if args.url else "Redline started at %s (data: %s)" % (url, DATA), flush=True)
+            print(url if args.url else
+                  "Redline started at %s (data: %s). %s" % (url, DATA, SKILL_HINT), flush=True)
             os._exit(0)
     SERVER_INFO.update(port=port, url=url, started=time.time())
     write_runtime(dict(SERVER_INFO, pid=os.getpid(), app=APP, version=VERSION, data=DATA))

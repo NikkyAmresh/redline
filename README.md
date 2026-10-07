@@ -49,20 +49,28 @@ Redline moves both into the browser and sends your feedback straight back to the
 
 3. Run `/reload-plugins`, or start a new session; the server starts with it.
 
-Redline is listed in [NikkyAmresh/claude-plugins](https://github.com/NikkyAmresh/claude-plugins), a marketplace for all of its author's Claude Code plugins. The plugin bundles the skill and starts the server when a session opens (reusing it if it is already running). Your plans and feedback live in `~/.claude/redline`, outside the plugin, so updates never touch them. Update with `/plugin update redline`.
+Redline is listed in [NikkyAmresh/claude-plugins](https://github.com/NikkyAmresh/claude-plugins), a marketplace for all of its author's Claude Code plugins. The plugin bundles the skills and starts the server when a session opens (reusing it if it is already running). Your plans and feedback live in `~/.claude/redline`, outside the plugin, so updates never touch them. Update with `/plugin update redline`.
 
 **From a git clone** (to hack on Redline itself):
 
 ```bash
 git clone https://github.com/NikkyAmresh/redline ~/.claude/redline
 git -C ~/.claude/redline config core.hooksPath hooks     # pre-push guard for local review data
-ln -s ../redline/skills/redline ~/.claude/skills/redline
+for s in redline plan-review prototype-review; do ln -s ../redline/skills/$s ~/.claude/skills/$s; done
 sh ~/.claude/redline/skills/redline/redline.sh start      # prints the URL
 ```
 
-Use one or the other, not both, or the skill loads twice.
+Use one or the other, not both, or the skills load twice. A clone set up before 1.4 links only `skills/redline`; add the `plan-review` and `prototype-review` links too.
 
-Then in any Claude Code session, ask for a plan or a prototype (or say `/redline`). Claude writes it, opens it in your browser and arms a watcher for your feedback.
+Then in any Claude Code session, ask for a plan or a prototype. Claude writes it, opens it in your browser and arms a watcher for your feedback. To start one directly:
+
+- `/redline:plan-review`: a plan, design doc, roadmap or architecture proposal, reviewed like a doc.
+- `/redline:prototype-review`: a clickable prototype, mockup or wireframe, reviewed by pinning comments to components.
+- `/redline:redline` (or `/redline`): picks one of the two from what you ask.
+
+The short forms `/plan-review` and `/prototype-review` work too, unless another command already uses the name.
+
+If Claude does not reach for Redline on its own: on setups with many skills, Claude Code lists only the names of the least used skills and drops their descriptions. The two skill names say what each is for, and the session hook names them for plan and prototype requests. Running `/redline:plan-review` or `/redline:prototype-review` once, or raising `skillListingBudgetFraction` in `~/.claude/settings.json` (for example to `0.015`), restores the descriptions.
 
 Two demos are seeded on first start, and they link to each other (the address is usually `http://127.0.0.1:4747`; see below):
 
@@ -84,9 +92,9 @@ sh skills/redline/redline.sh data     # the data directory
 - **Identity.** `GET /api/health` answers `{"app": "redline", "version", "pid", "port", "url", "data", ...}`, so nothing mistakes another app on the port for Redline.
 - **Single instance.** The running server holds a lock on `<data>/server.lock` for its whole life and records itself in `<data>/server.json`. A crashed server releases the lock, so a stale record never blocks a restart. Two sessions starting at once still end up with one server.
 - **Port.** `REDLINE_PORT` if set, else the last port it used (so open tabs keep working), else 4747; if that is taken, the next free one up to 4767. A port counts as taken if anything answers on it over IPv4 or IPv6. Redline listens on `127.0.0.1` and `::1`, so `localhost` and `127.0.0.1` reach the same server.
-- **Discovery.** Agents run `redline.sh url`; the plugin's session hook also prints "Redline is running at ..." into each session. `REDLINE_HOME` moves the data directory.
+- **Discovery.** Agents run `redline.sh url`; the plugin's session hook also prints "Redline is running at ..." into each session, with a line pointing plan requests at `redline:plan-review` and prototype requests at `redline:prototype-review`. `REDLINE_HOME` moves the data directory.
 
-Requirements: Python 3.7+ and Claude Code. macOS and Linux are supported; the skill's shell snippets are POSIX.
+Requirements: Python 3.7+ and Claude Code. macOS and Linux are supported; the skills' shell snippets are POSIX.
 
 ## How it works
 
@@ -113,7 +121,7 @@ Plans carry front matter (`title`, `version`, `status`, `updated`); prototypes c
 
 ## Prototype contract
 
-What Claude follows when it builds a prototype (full text in `skills/redline/SKILL.md`, section 7):
+What Claude follows when it builds a prototype (full text in `skills/prototype-review/SKILL.md`, section 2):
 
 - Screens are `[data-rl-screen]` sections with hash routes (`#/cart`, `#/product/3`, `#/cart?state=empty`).
 - Every element worth commenting on carries a stable `data-rl` id, on the group and on its parts. Ids never change between versions.
@@ -129,7 +137,9 @@ prototype.html   prototype review page: device stage, Comment mode, pins
 static/          studio.css and studio.js (the design system and page kit), rail.js (review
                  panel shared by both pages), anchors.js (plan comment anchors), Geist fonts,
                  bridge.js (injected into prototypes), kit.js (optional prototype helpers)
-skills/redline/  the Claude Code skill (SKILL.md) and redline.sh, the launcher
+skills/          the Claude Code skills: plan-review/ and prototype-review/, plus redline/
+                 (the /redline entry point, redline.sh the launcher, and review-loop.md,
+                 the inbox watcher and feedback loop both skills share)
 .claude-plugin/  plugin manifest (listed in the NikkyAmresh/claude-plugins marketplace)
 hooks/           hooks.json (plugin: start the server on session start), pre-push (git guard)
 examples/demo/   the demo plan and prototype seeded on first start
