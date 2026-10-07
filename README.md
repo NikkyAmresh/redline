@@ -64,6 +64,8 @@ Use one or the other, not both, or the skill loads twice.
 
 Then in any Claude Code session, ask for a plan or a prototype (or say `/redline`). Claude writes it, opens it in your browser and arms a watcher for your feedback.
 
+If Claude does not reach for Redline on its own: on setups with many skills, Claude Code may list Redline without its description, so a plain "plan this" or "prototype that" does not match it. Running `/redline:redline` once, or raising `skillListingBudgetFraction` in `~/.claude/settings.json` (for example to `0.015`), restores it.
+
 Two demos are seeded on first start, and they link to each other (the address is usually `http://127.0.0.1:4747`; see below):
 
 - `/plan/demo/delivery-slots`: a plan for a fictional plant shop. Select a sentence and try it.
@@ -84,7 +86,7 @@ sh skills/redline/redline.sh data     # the data directory
 - **Identity.** `GET /api/health` answers `{"app": "redline", "version", "pid", "port", "url", "data", ...}`, so nothing mistakes another app on the port for Redline.
 - **Single instance.** The running server holds a lock on `<data>/server.lock` for its whole life and records itself in `<data>/server.json`. A crashed server releases the lock, so a stale record never blocks a restart. Two sessions starting at once still end up with one server.
 - **Port.** `REDLINE_PORT` if set, else the last port it used (so open tabs keep working), else 4747; if that is taken, the next free one up to 4767. A port counts as taken if anything answers on it over IPv4 or IPv6. Redline listens on `127.0.0.1` and `::1`, so `localhost` and `127.0.0.1` reach the same server.
-- **Discovery.** Agents run `redline.sh url`; the plugin's session hook also prints "Redline is running at ..." into each session. `REDLINE_HOME` moves the data directory.
+- **Discovery.** Agents run `redline.sh url`; the plugin's session hook also prints "Redline is running at ..." into each session, with a line pointing plan and prototype requests at the skill. `REDLINE_HOME` moves the data directory.
 
 Requirements: Python 3.7+ and Claude Code. macOS and Linux are supported; the skill's shell snippets are POSIX.
 
